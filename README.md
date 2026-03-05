@@ -9,6 +9,19 @@ Current release includes the first module: **Route and Latency Probe**.
 - Runtime: terminal panel inside VPS (via SSH)
 - User type: non technical users can run it by following prompts
 
+## One Line Install + Run
+
+Recommended one-liner (auto clone/update and enter terminal panel):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<your-username>/<your-repo>/main/onekey.sh | bash -s -- https://github.com/<your-username>/<your-repo>.git
+```
+
+If you set your real repo URL as default inside `onekey.sh`, users can run an even shorter command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<your-username>/<your-repo>/main/onekey.sh | bash
+```
 ## Quick Start
 
 ```bash
@@ -43,3 +56,4 @@ chmod +x bootstrap.sh
 MIT License:
 
 - [tools/01-routeprobe/LICENSE](tools/01-routeprobe/LICENSE)
+
