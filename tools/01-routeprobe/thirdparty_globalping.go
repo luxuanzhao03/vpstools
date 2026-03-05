@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"bytes"
@@ -98,7 +98,7 @@ func globalpingCreateTracerouteMeasurement(localIP, location string, cfg config)
 	}
 
 	url := "https://api.globalping.io/v1/measurements"
-	statusCode, body, err := globalpingRequest(http.MethodPost, url, cfg.ThirdPartyToken, payload, cfg.ThirdPartyTimeoutSec)
+	statusCode, body, err := globalpingRequest(http.MethodPost, url, cfg.ThirdPartyToken, payload, cfg.ThirdPartyHTTPRequestTimeoutSec)
 	bodyText := strings.TrimSpace(string(body))
 	if err != nil {
 		if bodyText != "" {
@@ -193,7 +193,7 @@ func globalpingWaitMeasurement(measurementID string, cfg config) (map[string]int
 func globalpingFetchMeasurement(measurementID string, cfg config) (map[string]interface{}, string, error) {
 	url := fmt.Sprintf("https://api.globalping.io/v1/measurements/%s", measurementID)
 
-	statusCode, body, err := globalpingRequest(http.MethodGet, url, cfg.ThirdPartyToken, nil, cfg.ThirdPartyTimeoutSec)
+	statusCode, body, err := globalpingRequest(http.MethodGet, url, cfg.ThirdPartyToken, nil, cfg.ThirdPartyHTTPRequestTimeoutSec)
 	bodyText := strings.TrimSpace(string(body))
 	if err != nil {
 		if bodyText != "" {
@@ -221,8 +221,8 @@ func globalpingRequest(method, url, token string, payload interface{}, timeoutSe
 	if timeoutSec <= 0 {
 		timeoutSec = 30
 	}
-	if timeoutSec > 60 {
-		timeoutSec = 60
+	if timeoutSec < 3 {
+		timeoutSec = 3
 	}
 
 	var bodyReader io.Reader
@@ -244,7 +244,6 @@ func globalpingRequest(method, url, token string, payload interface{}, timeoutSe
 	}
 	if strings.TrimSpace(token) != "" {
 		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
-		req.Header.Set("x-api-key", strings.TrimSpace(token))
 	}
 
 	client := &http.Client{Timeout: time.Duration(timeoutSec) * time.Second}
@@ -514,9 +513,3 @@ func joinMessage(msgs []string) string {
 	}
 	return strings.Join(parts, "; ")
 }
-
-
-
-
-
-

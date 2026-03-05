@@ -1,11 +1,14 @@
-﻿package main
+package main
 
 import (
 	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -196,6 +199,7 @@ func runRouteProbeTool(reader *bufio.Reader, state *panelState) {
 		ThirdPartyLocation:   strings.TrimSpace(thirdPartyLocation),
 		ThirdPartyProbeLimit: 1,
 		ThirdPartyTimeoutSec: 90,
+		ThirdPartyHTTPRequestTimeoutSec: 20,
 	}
 
 	fmt.Println()
@@ -255,6 +259,12 @@ func runRouteProbeTool(reader *bufio.Reader, state *panelState) {
 }
 
 func printFriendlyReport(rep report) {
+	targets := make([]string, 0, len(rep.Results))
+	for _, item := range rep.Results {
+		targets = append(targets, item.Target)
+	}
+	prefetchTargetLocations(targets)
+
 	fmt.Println("[线路测量结果]")
 	fmt.Printf("测试时间: %s\n", rep.Timestamp)
 	fmt.Printf("服务器: %s\n", rep.Hostname)
@@ -543,8 +553,11 @@ func promptString(reader *bufio.Reader, label string) (string, error) {
 	fmt.Printf("%s: ", label)
 	line, err := reader.ReadString('\n')
 	if err != nil {
-		if strings.TrimSpace(line) != "" {
-			line = strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			line = trimmed
+		} else if errors.Is(err, io.EOF) {
+			return "", fmt.Errorf("检测到非交互输入 (EOF)，请在交互终端运行面板，或改用命令行参数模式")
 		} else {
 			return "", err
 		}
@@ -584,15 +597,12 @@ func waitForEnter(reader *bufio.Reader) {
 }
 
 func clearTerminal() {
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("cmd", "/c", "cls")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		_ = cmd.Run()
+		return
+	}
 	fmt.Print("\033[2J\033[H")
 }
-
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"fmt"
@@ -84,47 +84,28 @@ func runThirdPartyReverseTraceWithRetry(target, localIP string, cfg config) (tra
 	if strings.TrimSpace(baseCfg.ThirdPartyLocation) == "" {
 		baseCfg.ThirdPartyLocation = guessThirdPartyLocation(target)
 	}
-	if baseCfg.ThirdPartyProbeLimit < 2 {
-		baseCfg.ThirdPartyProbeLimit = 2
-	}
 
 	best, raw := runThirdPartyReverseTrace(target, localIP, baseCfg)
 	if !shouldRetryUnrecognized(best) {
 		return best, raw
 	}
 
-	rawParts := make([]string, 0, 3)
+	rawParts := make([]string, 0, 4)
 	if strings.TrimSpace(raw) != "" {
 		rawParts = append(rawParts, "# default\n"+raw)
 	}
 
-	retryCfg := baseCfg
-	if retryCfg.ThirdPartyProbeLimit < 3 {
-		retryCfg.ThirdPartyProbeLimit = 3
-	}
-	if strings.TrimSpace(retryCfg.ThirdPartyLocation) == "" {
-		retryCfg.ThirdPartyLocation = guessThirdPartyLocation(target)
-	}
+	for _, loc := range buildThirdPartyRetryLocations(baseCfg.ThirdPartyLocation, target) {
+		retryCfg := baseCfg
+		retryCfg.ThirdPartyLocation = loc
 
-	candidate, cRaw := runThirdPartyReverseTrace(target, localIP, retryCfg)
-	if strings.TrimSpace(cRaw) != "" {
-		rawParts = append(rawParts, "# retry-location\n"+cRaw)
-	}
-	best = pickBetterTrace(best, candidate)
-
-	if !isRouteRecognized(best.Hops) {
-		altCfg := retryCfg
-		if strings.EqualFold(strings.TrimSpace(altCfg.ThirdPartyLocation), "CN") {
-			altCfg.ThirdPartyLocation = "US"
-		} else if strings.EqualFold(strings.TrimSpace(altCfg.ThirdPartyLocation), "US") {
-			altCfg.ThirdPartyLocation = "CN"
+		candidate, cRaw := runThirdPartyReverseTrace(target, localIP, retryCfg)
+		if strings.TrimSpace(cRaw) != "" {
+			rawParts = append(rawParts, "# retry-location:"+loc+"\n"+cRaw)
 		}
-		if strings.TrimSpace(altCfg.ThirdPartyLocation) != strings.TrimSpace(retryCfg.ThirdPartyLocation) {
-			candidate2, cRaw2 := runThirdPartyReverseTrace(target, localIP, altCfg)
-			if strings.TrimSpace(cRaw2) != "" {
-				rawParts = append(rawParts, "# retry-alt-location\n"+cRaw2)
-			}
-			best = pickBetterTrace(best, candidate2)
+		best = pickBetterTrace(best, candidate)
+		if isRouteRecognized(best.Hops) {
+			break
 		}
 	}
 
@@ -133,6 +114,41 @@ func runThirdPartyReverseTraceWithRetry(target, localIP string, cfg config) (tra
 	}
 
 	return best, strings.TrimSpace(strings.Join(rawParts, "\n\n"))
+}
+
+func buildThirdPartyRetryLocations(baseLocation, target string) []string {
+	base := strings.ToUpper(strings.TrimSpace(baseLocation))
+	if base == "" {
+		base = strings.ToUpper(strings.TrimSpace(guessThirdPartyLocation(target)))
+	}
+
+	pool := []string{base, "CN", "US", "JP", "SG", "HK", "DE", "GB"}
+	seen := make(map[string]struct{}, len(pool))
+	out := make([]string, 0, len(pool))
+
+	for _, item := range pool {
+		item = strings.ToUpper(strings.TrimSpace(item))
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	if base == "" {
+		return out
+	}
+	// The first entry is base/default location, already used by initial request.
+	if len(out) == 1 {
+		return nil
+	}
+	return out[1:]
 }
 
 func shouldRetryUnrecognized(tr traceResult) bool {
@@ -226,9 +242,17 @@ func guessThirdPartyLocation(target string) string {
 	if strings.Contains(loc, "美国") {
 		return "US"
 	}
+	if strings.Contains(loc, "日本") {
+		return "JP"
+	}
+	if strings.Contains(loc, "新加坡") {
+		return "SG"
+	}
+	if strings.Contains(loc, "德国") {
+		return "DE"
+	}
+	if strings.Contains(loc, "英国") {
+		return "GB"
+	}
 	return ""
 }
-
-
-
-

@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -35,6 +35,7 @@ type config struct {
 	ThirdPartyToken      string
 	ThirdPartyProbeLimit int
 	ThirdPartyTimeoutSec int
+	ThirdPartyHTTPRequestTimeoutSec int
 }
 
 type report struct {
@@ -138,6 +139,7 @@ func main() {
 		thirdPartyToken      = flag.String("thirdparty-token", "", "Third-party API token (or use GLOBALPING_TOKEN env)")
 		thirdPartyProbeLimit = flag.Int("thirdparty-limit", 1, "Third-party probe count")
 		thirdPartyTimeoutSec = flag.Int("thirdparty-timeout-sec", 90, "Third-party measurement timeout seconds")
+		thirdPartyHTTPTimeout = flag.Int("thirdparty-http-timeout-sec", 20, "Third-party HTTP request timeout seconds")
 		includeRawFlag       = flag.Bool("include-raw", false, "Include raw command output in JSON")
 		outputFlag           = flag.String("out", "", "Write JSON report to file")
 	)
@@ -177,6 +179,7 @@ func main() {
 		ThirdPartyToken:      strings.TrimSpace(*thirdPartyToken),
 		ThirdPartyProbeLimit: *thirdPartyProbeLimit,
 		ThirdPartyTimeoutSec: *thirdPartyTimeoutSec,
+		ThirdPartyHTTPRequestTimeoutSec: *thirdPartyHTTPTimeout,
 	}
 
 	rep, err := generateReport(cfg, *includeRawFlag)
@@ -290,6 +293,9 @@ func normalizeConfig(cfg config) config {
 	}
 	if cfg.ThirdPartyTimeoutSec <= 0 {
 		cfg.ThirdPartyTimeoutSec = 90
+	}
+	if cfg.ThirdPartyHTTPRequestTimeoutSec <= 0 {
+		cfg.ThirdPartyHTTPRequestTimeoutSec = 20
 	}
 	if strings.TrimSpace(cfg.ThirdPartyToken) == "" {
 		cfg.ThirdPartyToken = strings.TrimSpace(os.Getenv("GLOBALPING_TOKEN"))
@@ -1093,16 +1099,3 @@ func exitWithError(msg string) {
 	fmt.Fprintln(os.Stderr, "error:", msg)
 	os.Exit(1)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

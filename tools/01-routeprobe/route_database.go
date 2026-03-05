@@ -1,6 +1,7 @@
-﻿package main
+package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net"
 	"os"
@@ -28,53 +29,27 @@ type routePrefixMatcher struct {
 }
 
 var (
-	routeDBOnce     sync.Once
-	routePrefixDB   []routePrefixMatcher
-	routeASNDB      map[int]string
-	asnTokenRe      = regexp.MustCompile(`(?i)\bas\s*([0-9]{2,10})\b`)
-	builtinRouteDB  = routeDBFile{
-		Prefixes: []routePrefixRule{
-			{CIDR: "59.43.0.0/16", Route: "电信CN2"},
-			{CIDR: "202.97.0.0/16", Route: "电信163"},
-			{CIDR: "61.152.0.0/16", Route: "电信163"},
-			{CIDR: "61.153.0.0/16", Route: "电信163"},
-			{CIDR: "219.158.0.0/16", Route: "联通169"},
-			{CIDR: "218.105.0.0/16", Route: "联通9929"},
-			{CIDR: "221.183.0.0/16", Route: "移动CMI"},
-			{CIDR: "221.176.0.0/16", Route: "移动CMI"},
-			{CIDR: "223.120.0.0/16", Route: "移动CMI"},
-			{CIDR: "216.218.0.0/16", Route: "Hurricane Electric"},
-			{CIDR: "184.105.0.0/16", Route: "Hurricane Electric"},
-			{CIDR: "154.54.0.0/16", Route: "Cogent"},
-			{CIDR: "62.115.0.0/16", Route: "Telia"},
-			{CIDR: "129.250.0.0/16", Route: "NTT"},
-		},
-		ASN: map[string]string{
-			"4134":  "电信163",
-			"4809":  "电信CN2",
-			"4837":  "联通169",
-			"9929":  "联通9929",
-			"9808":  "移动CMI",
-			"58453": "移动CMI",
-			"6939":  "Hurricane Electric",
-			"174":   "Cogent",
-			"1299":  "Telia",
-			"2914":  "NTT",
-			"3356":  "Lumen/Level3",
-			"3257":  "GTT",
-			"6461":  "Zayo",
-		},
-	}
+	routeDBOnce   sync.Once
+	routePrefixDB []routePrefixMatcher
+	routeASNDB    map[int]string
+	asnTokenRe    = regexp.MustCompile(`(?i)\bas\s*([0-9]{2,10})\b`)
+
+	//go:embed route_db.json
+	embeddedRouteDBJSON []byte
 )
 
 func initRouteDatabase() {
-	routePrefixDB = make([]routePrefixMatcher, 0, len(builtinRouteDB.Prefixes)+32)
-	routeASNDB = make(map[int]string, len(builtinRouteDB.ASN)+32)
+	routePrefixDB = make([]routePrefixMatcher, 0, 64)
+	routeASNDB = make(map[int]string, 64)
 
-	mergeRouteDB(builtinRouteDB)
+	seenPrefix := make(map[string]struct{}, 128)
+
+	if embedded, ok := loadEmbeddedRouteDB(); ok {
+		mergeRouteDB(embedded, seenPrefix)
+	}
 
 	if external, ok := loadExternalRouteDB(); ok {
-		mergeRouteDB(external)
+		mergeRouteDB(external, seenPrefix)
 	}
 
 	sort.SliceStable(routePrefixDB, func(i, j int) bool {
@@ -84,18 +59,24 @@ func initRouteDatabase() {
 	})
 }
 
-func mergeRouteDB(db routeDBFile) {
+func mergeRouteDB(db routeDBFile, seenPrefix map[string]struct{}) {
 	for _, p := range db.Prefixes {
 		cidr := strings.TrimSpace(p.CIDR)
 		route := strings.TrimSpace(p.Route)
 		if cidr == "" || route == "" {
 			continue
 		}
+		key := cidr + "|" + route
+		if _, ok := seenPrefix[key]; ok {
+			continue
+		}
+
 		_, ipNet, err := net.ParseCIDR(cidr)
 		if err != nil || ipNet == nil {
 			continue
 		}
 		routePrefixDB = append(routePrefixDB, routePrefixMatcher{route: route, net: ipNet})
+		seenPrefix[key] = struct{}{}
 	}
 
 	for k, v := range db.ASN {
@@ -109,6 +90,17 @@ func mergeRouteDB(db routeDBFile) {
 		}
 		routeASNDB[asn] = route
 	}
+}
+
+func loadEmbeddedRouteDB() (routeDBFile, bool) {
+	if len(embeddedRouteDBJSON) == 0 {
+		return routeDBFile{}, false
+	}
+	var db routeDBFile
+	if err := json.Unmarshal(embeddedRouteDBJSON, &db); err != nil {
+		return routeDBFile{}, false
+	}
+	return db, true
 }
 
 func loadExternalRouteDB() (routeDBFile, bool) {
@@ -193,6 +185,8 @@ func normalizeRouteAlias(name string) string {
 		return "联通169"
 	case strings.Contains(n, "联通9929"):
 		return "联通9929"
+	case strings.Contains(n, "as10099") || strings.Contains(n, "联通cug"):
+		return "联通CUG"
 	case strings.Contains(n, "移动cmi"):
 		return "移动CMI"
 	case strings.Contains(n, "hurricane electric"):
@@ -209,6 +203,10 @@ func normalizeRouteAlias(name string) string {
 		return "GTT"
 	case strings.Contains(n, "zayo"):
 		return "Zayo"
+	case strings.Contains(n, "pccw") || strings.Contains(n, "as3491"):
+		return "PCCW"
+	case strings.Contains(n, "telstra") || strings.Contains(n, "as1221"):
+		return "Telstra"
 	default:
 		return ""
 	}

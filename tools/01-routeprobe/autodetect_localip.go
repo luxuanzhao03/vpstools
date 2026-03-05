@@ -30,7 +30,7 @@ func ensureReturnLocalIP(cfg *config) error {
 
 	ip, source, err := detectLocalReachableIP()
 	if err != nil {
-		return fmt.Errorf("回程测量需要本机可回测IP，自动获取失败: %v；请手动指定 -local-ip", err)
+		return fmt.Errorf("回程测量需要本机可回测 IP，自动获取失败: %v；请手动指定 -local-ip", err)
 	}
 
 	cfg.LocalIP = ip
@@ -48,7 +48,7 @@ func detectLocalReachableIP() (string, string, error) {
 	if ip, source, err := detectPublicIPByHTTP(); err == nil && ip != "" {
 		return ip, source, nil
 	} else if err != nil {
-		errs = append(errs, "http探测失败: "+err.Error())
+		errs = append(errs, "HTTP 探测失败: "+err.Error())
 	}
 
 	if ip := detectOutboundRouteIP(); ip != "" {
@@ -57,7 +57,7 @@ func detectLocalReachableIP() (string, string, error) {
 		}
 		return ip, "udp-outbound-private", nil
 	}
-	errs = append(errs, "udp路由探测失败")
+	errs = append(errs, "UDP 路由探测失败")
 
 	if ip := detectInterfaceFallbackIP(); ip != "" {
 		if isLikelyPublicIP(ip) {
@@ -71,21 +71,27 @@ func detectLocalReachableIP() (string, string, error) {
 }
 
 func detectPublicIPByHTTP() (string, string, error) {
-	endpoints := []string{
-		"https://4.ipw.cn",
-		"https://myip.ipip.net",
-		"https://api.ipify.org",
-		"https://ifconfig.me/ip",
-		"https://ifconfig.co/ip",
-		"https://ip.sb",
-		"http://4.ipw.cn",
-		"http://ip.3322.net",
+	type endpoint struct {
+		url      string
+		insecure bool
+	}
+
+	// Prefer HTTPS. Plain HTTP endpoints are only a last-resort fallback.
+	endpoints := []endpoint{
+		{url: "https://4.ipw.cn"},
+		{url: "https://myip.ipip.net"},
+		{url: "https://api.ipify.org"},
+		{url: "https://ifconfig.me/ip"},
+		{url: "https://ifconfig.co/ip"},
+		{url: "https://ip.sb"},
+		{url: "http://4.ipw.cn", insecure: true},
+		{url: "http://ip.3322.net", insecure: true},
 	}
 
 	client := &http.Client{Timeout: 4 * time.Second}
 	var lastErr error
-	for _, url := range endpoints {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+	for _, ep := range endpoints {
+		req, err := http.NewRequest(http.MethodGet, ep.url, nil)
 		if err != nil {
 			lastErr = err
 			continue
@@ -104,24 +110,28 @@ func detectPublicIPByHTTP() (string, string, error) {
 			continue
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			lastErr = fmt.Errorf("%s status %d", url, resp.StatusCode)
+			lastErr = fmt.Errorf("%s status %d", ep.url, resp.StatusCode)
 			continue
 		}
 
 		ip := firstIP(string(body))
 		if ip == "" {
-			lastErr = fmt.Errorf("%s no ip in response", url)
+			lastErr = fmt.Errorf("%s no ip in response", ep.url)
 			continue
 		}
 		if !validIP(ip) {
-			lastErr = fmt.Errorf("%s returned invalid ip: %s", url, ip)
+			lastErr = fmt.Errorf("%s returned invalid ip: %s", ep.url, ip)
 			continue
 		}
 		if !isLikelyPublicIP(ip) {
-			lastErr = fmt.Errorf("%s returned non-public ip: %s", url, ip)
+			lastErr = fmt.Errorf("%s returned non-public ip: %s", ep.url, ip)
 			continue
 		}
-		return ip, "endpoint:" + url, nil
+
+		if ep.insecure {
+			fmt.Fprintf(os.Stderr, "[warn] local-ip resolved via insecure HTTP endpoint: %s\n", ep.url)
+		}
+		return ip, "endpoint:" + ep.url, nil
 	}
 
 	if lastErr == nil {

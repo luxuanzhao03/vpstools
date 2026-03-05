@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"encoding/json"
@@ -16,10 +16,35 @@ var (
 	builtinTargetLocZH  = map[string]string{
 		"223.5.5.5":  "中国大陆",
 		"74.82.42.42": "美国西海岸",
-		"1.1.1.1":    "美国",
-		"8.8.8.8":    "美国",
+		"1.1.1.1":    "全球公共DNS",
+		"8.8.8.8":    "全球公共DNS",
 	}
 )
+
+func prefetchTargetLocations(targets []string) {
+	if len(targets) == 0 {
+		return
+	}
+
+	unique := make(map[string]struct{}, len(targets))
+	for _, t := range targets {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		unique[t] = struct{}{}
+	}
+
+	var wg sync.WaitGroup
+	for target := range unique {
+		wg.Add(1)
+		go func(t string) {
+			defer wg.Done()
+			_ = resolveTargetLocationZH(t)
+		}(target)
+	}
+	wg.Wait()
+}
 
 func formatTargetCNLabel(target string) string {
 	loc := strings.TrimSpace(resolveTargetLocationZH(target))
@@ -126,29 +151,29 @@ func lookupByIPWhoIS(ip string) string {
 }
 
 func lookupByIPAPI(ip string) string {
-	url := fmt.Sprintf("http://ip-api.com/json/%s?lang=zh-CN&fields=status,country,regionName,city", strings.TrimSpace(ip))
+	url := fmt.Sprintf("https://ipapi.co/%s/json/", strings.TrimSpace(ip))
 	body, err := fetchText(url, 3*time.Second)
 	if err != nil {
 		return ""
 	}
 
 	var resp struct {
-		Status     string `json:"status"`
-		Country    string `json:"country"`
-		RegionName string `json:"regionName"`
-		City       string `json:"city"`
+		Error       bool   `json:"error"`
+		CountryName string `json:"country_name"`
+		Region      string `json:"region"`
+		City        string `json:"city"`
 	}
 	if err := json.Unmarshal([]byte(body), &resp); err != nil {
 		return ""
 	}
-	if strings.ToLower(strings.TrimSpace(resp.Status)) != "success" {
+	if resp.Error {
 		return ""
 	}
-	country := normalizeCountryZH(resp.Country)
+	country := normalizeCountryZH(resp.CountryName)
 	if country == "" {
 		return ""
 	}
-	return mergeLocation(country, resp.RegionName, resp.City)
+	return mergeLocation(country, resp.Region, resp.City)
 }
 
 func fetchText(url string, timeout time.Duration) (string, error) {
@@ -229,7 +254,7 @@ func roughCountryByPrefix(ip string) string {
 	if strings.HasPrefix(ip, "223.") {
 		return "中国"
 	}
-	if strings.HasPrefix(ip, "74.") || strings.HasPrefix(ip, "8.") || strings.HasPrefix(ip, "1.") {
+	if strings.HasPrefix(ip, "74.") {
 		return "美国"
 	}
 	return ""
