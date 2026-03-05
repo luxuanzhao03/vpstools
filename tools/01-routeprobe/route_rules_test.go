@@ -11,6 +11,8 @@ func TestDetectRouteByKeywords(t *testing.T) {
 		{text: "AS3491 pccwglobal transit", want: "PCCW"},
 		{text: "as1221 telstra international", want: "Telstra"},
 		{text: "AS10099 china unicom global", want: "联通CUG"},
+		{text: "AS58453 ChinaMobileInternational", want: "移动CMI"},
+		{text: "AS56040 cmnet backbone", want: "移动CMNET"},
 	}
 
 	for _, tc := range cases {
@@ -28,6 +30,12 @@ func TestLookupRouteByTextDatabaseASN(t *testing.T) {
 	if got := lookupRouteByTextDatabase("network as10099"); got != "联通CUG" {
 		t.Fatalf("lookupRouteByTextDatabase(AS10099) = %q, want %q", got, "联通CUG")
 	}
+	if got := lookupRouteByTextDatabase("network as58453"); got != "移动CMI" {
+		t.Fatalf("lookupRouteByTextDatabase(AS58453) = %q, want %q", got, "移动CMI")
+	}
+	if got := lookupRouteByTextDatabase("network as56040"); got != "移动CMNET" {
+		t.Fatalf("lookupRouteByTextDatabase(AS56040) = %q, want %q", got, "移动CMNET")
+	}
 }
 
 func TestLookupRouteByIPDatabase(t *testing.T) {
@@ -36,5 +44,11 @@ func TestLookupRouteByIPDatabase(t *testing.T) {
 	}
 	if got := lookupRouteByIPDatabase("63.218.1.1"); got != "PCCW" {
 		t.Fatalf("lookupRouteByIPDatabase(63.218.1.1) = %q, want %q", got, "PCCW")
+	}
+	if got := lookupRouteByIPDatabase("223.120.20.1"); got != "移动CMI" {
+		t.Fatalf("lookupRouteByIPDatabase(223.120.20.1) = %q, want %q", got, "移动CMI")
+	}
+	if got := lookupRouteByIPDatabase("221.183.20.1"); got != "移动CMNET" {
+		t.Fatalf("lookupRouteByIPDatabase(221.183.20.1) = %q, want %q", got, "移动CMNET")
 	}
 }

@@ -187,8 +187,12 @@ func normalizeRouteAlias(name string) string {
 		return "联通9929"
 	case strings.Contains(n, "as10099") || strings.Contains(n, "联通cug"):
 		return "联通CUG"
-	case strings.Contains(n, "移动cmi"):
+	case strings.Contains(n, "移动cmi") || strings.Contains(n, "china mobile cmi"):
 		return "移动CMI"
+	case strings.Contains(n, "移动cmnet") || strings.Contains(n, "china mobile cmnet"):
+		return "移动CMNET"
+	case strings.Contains(n, "cmnet") || strings.Contains(n, "as9808") || strings.Contains(n, "as56040"):
+		return "移动CMNET"
 	case strings.Contains(n, "hurricane electric"):
 		return "Hurricane Electric"
 	case strings.Contains(n, "cogent"):

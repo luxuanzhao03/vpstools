@@ -14,7 +14,8 @@ var routeDetectRules = []routeKeywordRule{
 	{Name: "电信CN2", Keywords: []string{"cn2", "ctgnet", "59.43."}},
 	{Name: "电信163", Keywords: []string{"chinanet", "163.com", "as4134", "202.97.", "61.152.", "61.153."}},
 	{Name: "联通169", Keywords: []string{"as4837", "cu169", "chinaunicom", "219.158.", "unicom"}},
-	{Name: "移动CMI", Keywords: []string{"cmi", "cmcc", "chinamobile", "as9808", "221.183.", "221.176.", "223.120."}},
+	{Name: "移动CMI", Keywords: []string{"as58453", "chinamobileinternational", "cmi", "223.120."}},
+	{Name: "移动CMNET", Keywords: []string{"as9808", "as56040", "cmnet", "cmcc", "chinamobile", "221.183.", "221.176.", "120.198."}},
 	{Name: "教育网CERNET", Keywords: []string{"cernet"}},
 	{Name: "Hurricane Electric", Keywords: []string{"he.net", "hurricane"}},
 	{Name: "Cogent", Keywords: []string{"cogent"}},
@@ -35,6 +36,7 @@ var chinaCarrierRouteSet = map[string]struct{}{
 	"联通9929":     {},
 	"联通CUG":      {},
 	"移动CMI":      {},
+	"移动CMNET":    {},
 	"教育网CERNET": {},
 }
 

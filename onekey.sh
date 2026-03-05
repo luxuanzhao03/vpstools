@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 DEFAULT_REPO_URL="https://github.com/luxuanzhao03/vpstools.git"
@@ -96,7 +96,19 @@ sync_repo() {
 run_panel() {
   cd "$INSTALL_DIR/tools/01-routeprobe"
   chmod +x bootstrap.sh
-  exec ./bootstrap.sh --run-panel
+
+  if [[ -t 0 && -t 1 ]]; then
+    exec ./bootstrap.sh --run-panel
+  fi
+
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    echo "[onekey] non-interactive stdin detected, switching panel to /dev/tty"
+    exec ./bootstrap.sh --run-panel </dev/tty >/dev/tty
+  fi
+
+  echo "[onekey] no interactive TTY detected, panel cannot be opened now"
+  echo "[onekey] installed successfully. run this command later:"
+  echo "[onekey]   cd $INSTALL_DIR/tools/01-routeprobe && ./bootstrap.sh --run-panel"
 }
 
 ensure_git
