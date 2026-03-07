@@ -16,7 +16,7 @@ run_root() {
   elif need_cmd sudo; then
     sudo "$@"
   else
-    echo "[onekey] need root or sudo to install dependencies"
+    echo "[onekey] 安装依赖需要 root 或 sudo 权限"
     exit 1
   fi
 }
@@ -24,7 +24,7 @@ run_root() {
 validate_install_dir() {
   case "$INSTALL_DIR" in
     ""|"/"|"."|"..")
-      echo "[onekey] invalid install dir: $INSTALL_DIR"
+      echo "[onekey] 安装目录无效：$INSTALL_DIR"
       exit 1
       ;;
   esac
@@ -35,7 +35,7 @@ ensure_git() {
     return
   fi
 
-  echo "[onekey] git not found, installing..."
+  echo "[onekey] 未检测到 git，正在安装..."
   if need_cmd apt-get; then
     run_root apt-get update
     run_root apt-get install -y git
@@ -50,7 +50,7 @@ ensure_git() {
   elif need_cmd apk; then
     run_root apk add --no-cache git
   else
-    echo "[onekey] unsupported package manager, please install git manually"
+    echo "[onekey] 当前系统的包管理器不受支持，请手动安装 git"
     exit 1
   fi
 }
@@ -61,13 +61,13 @@ resolve_install_dir() {
   if [[ -e "$INSTALL_DIR" ]]; then
     if [[ ! -w "$INSTALL_DIR" ]]; then
       local fallback="$HOME/.vps-tools"
-      echo "[onekey] no write permission on $INSTALL_DIR, fallback to $fallback"
+      echo "[onekey] 对 $INSTALL_DIR 没有写权限，改用 $fallback"
       INSTALL_DIR="$fallback"
     fi
   else
     if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
       local fallback="$HOME/.vps-tools"
-      echo "[onekey] cannot create $INSTALL_DIR, fallback to $fallback"
+      echo "[onekey] 无法创建 $INSTALL_DIR，改用 $fallback"
       INSTALL_DIR="$fallback"
       mkdir -p "$INSTALL_DIR"
     fi
@@ -76,7 +76,7 @@ resolve_install_dir() {
 
 sync_repo() {
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    echo "[onekey] updating repo: $INSTALL_DIR"
+    echo "[onekey] 正在更新仓库：$INSTALL_DIR"
     git -C "$INSTALL_DIR" fetch origin "$BRANCH"
     git -C "$INSTALL_DIR" checkout "$BRANCH"
     git -C "$INSTALL_DIR" pull --ff-only origin "$BRANCH"
@@ -84,12 +84,12 @@ sync_repo() {
   fi
 
   if [[ -e "$INSTALL_DIR" && -n "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]]; then
-    echo "[onekey] install dir exists and is not a git repo: $INSTALL_DIR"
-    echo "[onekey] please set VPS_TOOLS_DIR to an empty directory, or clean it manually"
+    echo "[onekey] 安装目录已存在且不是 git 仓库：$INSTALL_DIR"
+    echo "[onekey] 请将 VPS_TOOLS_DIR 指向一个空目录，或手动清理该目录"
     exit 1
   fi
 
-  echo "[onekey] cloning repo into: $INSTALL_DIR"
+  echo "[onekey] 正在克隆仓库到：$INSTALL_DIR"
   git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
 }
 
@@ -102,12 +102,12 @@ run_toolbox() {
   fi
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
-    echo "[onekey] non-interactive stdin detected, switching toolbox to /dev/tty"
+    echo "[onekey] 检测到当前 stdin 非交互式，切换到 /dev/tty 打开工具箱"
     exec ./toolbox.sh </dev/tty >/dev/tty
   fi
 
-  echo "[onekey] no interactive TTY detected, toolbox cannot be opened now"
-  echo "[onekey] installed successfully. run this command later:"
+  echo "[onekey] 未检测到可交互终端，暂时无法打开工具箱"
+  echo "[onekey] 安装已完成，稍后可手动运行："
   echo "[onekey]   cd $INSTALL_DIR && ./toolbox.sh"
 }
 

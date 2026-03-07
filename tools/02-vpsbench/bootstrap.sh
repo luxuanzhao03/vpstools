@@ -11,7 +11,7 @@ log() {
 }
 
 err() {
-  printf "[bootstrap] ERROR: %s\n" "$*" >&2
+  printf "[bootstrap] 错误：%s\n" "$*" >&2
 }
 
 version_ge() {
@@ -40,7 +40,7 @@ run_as_root() {
   elif command -v sudo >/dev/null 2>&1; then
     sudo "$@"
   else
-    err "need root or sudo for: $*"
+    err "执行该操作需要 root 或 sudo 权限：$*"
     return 1
   fi
 }
@@ -110,7 +110,7 @@ pm_install() {
       run_as_root apk add --no-cache "${pkgs[@]}"
       ;;
     *)
-      err "unsupported package manager: $pm"
+      err "不支持的包管理器：$pm"
       return 1
       ;;
   esac
@@ -119,11 +119,11 @@ pm_install() {
 install_go_via_package_manager() {
   local pm pkg current
   if ! pm="$(pm_name)"; then
-    log "package manager not found; skip package install"
+    log "未找到包管理器，跳过包管理器安装路径"
     return 1
   fi
 
-  log "trying package manager install via ${pm}"
+  log "尝试通过 ${pm} 安装 Go"
   pm_update_if_needed "$pm"
 
   case "$pm" in
@@ -132,7 +132,7 @@ install_go_via_package_manager() {
         if pm_install "$pm" "$pkg"; then
           if current="$(detect_go_version)"; then
             if version_ge "$current" "$REQUIRED_GO_VERSION"; then
-              log "go ready from package manager: ${current}"
+              log "Go 已就绪：${current}"
               return 0
             fi
           fi
@@ -144,7 +144,7 @@ install_go_via_package_manager() {
         if pm_install "$pm" "$pkg"; then
           if current="$(detect_go_version)"; then
             if version_ge "$current" "$REQUIRED_GO_VERSION"; then
-              log "go ready from package manager: ${current}"
+              log "Go 已就绪：${current}"
               return 0
             fi
           fi
@@ -163,11 +163,11 @@ ensure_fetch_tools() {
   fi
 
   if ! pm="$(pm_name)"; then
-    err "no downloader and no known package manager"
+    err "既没有 curl/wget，也没有可识别的包管理器"
     return 1
   fi
 
-  log "curl/wget not found, installing downloader tools"
+  log "未检测到 curl/wget，正在安装下载工具"
   pm_update_if_needed "$pm"
   pm_install "$pm" curl wget ca-certificates tar
 }
@@ -197,13 +197,13 @@ install_go_official() {
 
   case "$os" in
     linux) ;;
-    *) err "unsupported OS for tarball install: $os"; return 1 ;;
+    *) err "当前系统不支持 tarball 安装 Go：$os"; return 1 ;;
   esac
 
   case "$arch" in
     x86_64|amd64) arch="amd64" ;;
     aarch64|arm64) arch="arm64" ;;
-    *) err "unsupported arch for tarball install: $arch"; return 1 ;;
+    *) err "当前架构不支持 tarball 安装 Go：$arch"; return 1 ;;
   esac
 
   ensure_fetch_tools
@@ -220,7 +220,7 @@ install_go_official() {
     "https://dl.google.com/go/go${INSTALL_GO_VERSION}.${os}-${arch}.tar.gz"; do
 
     rm -f "$tarball"
-    log "trying download: ${url}"
+    log "尝试下载：${url}"
     if ! download_file "$url" "$tarball"; then
       continue
     fi
@@ -233,7 +233,7 @@ install_go_official() {
       continue
     fi
 
-    log "installing Go into /usr/local/go"
+    log "正在安装 Go 到 /usr/local/go"
     run_as_root rm -rf /usr/local/go
     run_as_root tar -C /usr/local -xzf "$tarball"
 
@@ -245,14 +245,14 @@ install_go_official() {
     rm -rf "$tmpdir"
 
     if current="$(detect_go_version)" && version_ge "$current" "$REQUIRED_GO_VERSION"; then
-      log "go ready from tarball: ${current}"
+      log "Go 已就绪：${current}"
       return 0
     fi
 
     if [ -x /usr/local/go/bin/go ]; then
       export PATH="/usr/local/go/bin:${PATH}"
       if current="$(detect_go_version)" && version_ge "$current" "$REQUIRED_GO_VERSION"; then
-        log "go ready from tarball: ${current}"
+        log "Go 已就绪：${current}"
         return 0
       fi
     fi
@@ -267,7 +267,7 @@ ensure_go() {
 
   if current="$(detect_go_version)"; then
     if version_ge "$current" "$REQUIRED_GO_VERSION"; then
-      log "go detected: ${current} (meets >= ${REQUIRED_GO_VERSION})"
+      log "已检测到 Go：${current}（满足 >= ${REQUIRED_GO_VERSION}）"
       return 0
     fi
   fi
@@ -276,21 +276,21 @@ ensure_go() {
     return 0
   fi
 
-  log "package manager path not enough; trying tarball mirrors"
+  log "包管理器安装路径不可用或版本不足，尝试 tarball 镜像安装"
   if install_go_official; then
     return 0
   fi
 
-  err "unable to install Go automatically"
-  err "please install Go >= ${REQUIRED_GO_VERSION} manually and re-run"
+  err "无法自动安装 Go"
+  err "请手动安装 Go >= ${REQUIRED_GO_VERSION} 后重新运行"
   return 1
 }
 
 build_binary() {
   cd "$SCRIPT_DIR"
-  log "building ${APP_NAME}"
+  log "正在构建 ${APP_NAME}"
   go build -o "$APP_NAME" .
-  log "build complete: ${SCRIPT_DIR}/${APP_NAME}"
+  log "构建完成：${SCRIPT_DIR}/${APP_NAME}"
 }
 
 main() {
@@ -306,11 +306,11 @@ main() {
   build_binary
 
   if [ "$mode" = "run" ]; then
-    log "starting benchmark"
+    log "开始执行 VPS 参数测试"
     exec "${SCRIPT_DIR}/${APP_NAME}" "${args[@]}"
   fi
 
-  log "done. next run: ./${APP_NAME}"
+  log "处理完成。下次可直接运行：./${APP_NAME}"
 }
 
 main "$@"

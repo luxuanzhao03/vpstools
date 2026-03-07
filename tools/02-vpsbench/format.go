@@ -11,33 +11,33 @@ import (
 func formatHumanReport(rep report) string {
 	var b strings.Builder
 
-	b.WriteString("VPS Bench Report\n")
-	b.WriteString(fmt.Sprintf("Time: %s\n", rep.Timestamp))
-	b.WriteString(fmt.Sprintf("Host: %s\n", rep.Hostname))
+	b.WriteString("VPS 参数测试报告\n")
+	b.WriteString(fmt.Sprintf("测试时间：%s\n", rep.Timestamp))
+	b.WriteString(fmt.Sprintf("主机名称：%s\n", rep.Hostname))
 	b.WriteString(fmt.Sprintf(
-		"System: %s/%s, logical cores %d, Go %s",
+		"系统信息：%s/%s，逻辑核心 %d，Go %s",
 		rep.System.OS,
 		rep.System.Arch,
 		rep.System.LogicalCores,
 		rep.System.GoVersion,
 	))
 	if rep.System.CPUModel != "" {
-		b.WriteString(fmt.Sprintf(", CPU %s", rep.System.CPUModel))
+		b.WriteString(fmt.Sprintf("，CPU %s", rep.System.CPUModel))
 	}
 	if rep.System.TotalMemoryBytes > 0 {
-		b.WriteString(fmt.Sprintf(", RAM %s", formatBytesIEC(rep.System.TotalMemoryBytes)))
+		b.WriteString(fmt.Sprintf("，内存 %s", formatBytesIEC(rep.System.TotalMemoryBytes)))
 	}
 	if rep.System.KernelVersion != "" {
-		b.WriteString(fmt.Sprintf(", kernel %s", rep.System.KernelVersion))
+		b.WriteString(fmt.Sprintf("，内核 %s", rep.System.KernelVersion))
 	}
 	b.WriteString("\n")
 
 	if rep.CPU != nil {
 		if rep.CPU.Error != "" {
-			b.WriteString(fmt.Sprintf("CPU: error: %s\n", rep.CPU.Error))
+			b.WriteString(fmt.Sprintf("CPU：测试失败：%s\n", rep.CPU.Error))
 		} else {
 			b.WriteString(fmt.Sprintf(
-				"CPU: single-core SHA256 %s, multi-core SHA256 %s, workers %d\n",
+				"CPU：单核 SHA256 %s，多核 SHA256 %s，并发线程 %d\n",
 				formatMiBPerSec(rep.CPU.SingleCoreMiBPS),
 				formatMiBPerSec(rep.CPU.MultiCoreMiBPS),
 				rep.CPU.Workers,
@@ -47,10 +47,10 @@ func formatHumanReport(rep report) string {
 
 	if rep.Memory != nil {
 		if rep.Memory.Error != "" {
-			b.WriteString(fmt.Sprintf("Memory: error: %s\n", rep.Memory.Error))
+			b.WriteString(fmt.Sprintf("内存：测试失败：%s\n", rep.Memory.Error))
 		} else {
 			b.WriteString(fmt.Sprintf(
-				"Memory: copy %s, fill %s, buffer %s\n",
+				"内存：拷贝 %s，填充 %s，缓冲区 %s\n",
 				formatGiBPerSec(rep.Memory.CopyGiBPS),
 				formatGiBPerSec(rep.Memory.FillGiBPS),
 				formatBytesIEC(uint64(rep.Memory.BufferBytes)),
@@ -60,10 +60,10 @@ func formatHumanReport(rep report) string {
 
 	if rep.Disk != nil {
 		if rep.Disk.Error != "" {
-			b.WriteString(fmt.Sprintf("Disk: error: %s\n", rep.Disk.Error))
+			b.WriteString(fmt.Sprintf("磁盘：测试失败：%s\n", rep.Disk.Error))
 		} else {
 			b.WriteString(fmt.Sprintf(
-				"Disk: write %s, read %s, fsync %.2f ms, file %s in %s\n",
+				"磁盘：写入 %s，读取 %s，fsync %.2f ms，测试文件 %s，目录 %s\n",
 				formatMiBPerSec(rep.Disk.WriteMiBPS),
 				formatMiBPerSec(rep.Disk.ReadMiBPS),
 				rep.Disk.FsyncMs,
@@ -74,22 +74,22 @@ func formatHumanReport(rep report) string {
 	}
 
 	if rep.Network != nil {
-		b.WriteString("Network:")
+		b.WriteString("网络：")
 		if rep.Network.Download.Error == "" {
-			b.WriteString(fmt.Sprintf(" download %s", formatMbps(rep.Network.Download.ThroughputMbps)))
+			b.WriteString(fmt.Sprintf(" 下载 %s", formatMbps(rep.Network.Download.ThroughputMbps)))
 		} else {
-			b.WriteString(fmt.Sprintf(" download error (%s)", rep.Network.Download.Error))
+			b.WriteString(fmt.Sprintf(" 下载失败（%s）", rep.Network.Download.Error))
 		}
 		if rep.Network.Upload.Error == "" {
-			b.WriteString(fmt.Sprintf(", upload %s", formatMbps(rep.Network.Upload.ThroughputMbps)))
+			b.WriteString(fmt.Sprintf("，上传 %s", formatMbps(rep.Network.Upload.ThroughputMbps)))
 		} else {
-			b.WriteString(fmt.Sprintf(", upload error (%s)", rep.Network.Upload.Error))
+			b.WriteString(fmt.Sprintf("，上传失败（%s）", rep.Network.Upload.Error))
 		}
-		b.WriteString(fmt.Sprintf(", streams %d\n", rep.Network.Streams))
+		b.WriteString(fmt.Sprintf("，并发流 %d\n", rep.Network.Streams))
 	}
 
 	if len(rep.Errors) > 0 {
-		b.WriteString("Warnings:\n")
+		b.WriteString("提示信息：\n")
 		for _, err := range rep.Errors {
 			b.WriteString("- ")
 			b.WriteString(err)
@@ -103,7 +103,7 @@ func formatHumanReport(rep report) string {
 func parseByteSize(raw string) (int64, error) {
 	input := strings.TrimSpace(raw)
 	if input == "" {
-		return 0, fmt.Errorf("empty size")
+		return 0, fmt.Errorf("大小不能为空")
 	}
 
 	input = strings.ReplaceAll(input, " ", "")
@@ -117,7 +117,7 @@ func parseByteSize(raw string) (int64, error) {
 		break
 	}
 	if split == 0 {
-		return 0, fmt.Errorf("missing numeric component")
+		return 0, fmt.Errorf("缺少数字部分")
 	}
 
 	numberPart := input[:split]
@@ -125,20 +125,20 @@ func parseByteSize(raw string) (int64, error) {
 
 	value, err := strconv.ParseFloat(numberPart, 64)
 	if err != nil {
-		return 0, fmt.Errorf("parse numeric component: %w", err)
+		return 0, fmt.Errorf("数字部分解析失败：%w", err)
 	}
 	if value <= 0 {
-		return 0, fmt.Errorf("size must be > 0")
+		return 0, fmt.Errorf("大小必须大于 0")
 	}
 
 	multiplier, ok := byteUnits[unitPart]
 	if !ok {
-		return 0, fmt.Errorf("unsupported unit %q", input[split:])
+		return 0, fmt.Errorf("不支持的单位 %q", input[split:])
 	}
 
 	size := value * multiplier
 	if size > math.MaxInt64 {
-		return 0, fmt.Errorf("size overflows int64")
+		return 0, fmt.Errorf("大小超出 int64 范围")
 	}
 
 	return int64(size), nil

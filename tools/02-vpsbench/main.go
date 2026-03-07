@@ -118,25 +118,25 @@ type networkEndpointResult struct {
 
 func main() {
 	var (
-		jsonOnlyFlag        = flag.Bool("json", false, "Print JSON report only")
-		outputFlag          = flag.String("out", "", "Write JSON report to file")
-		strictFlag          = flag.Bool("strict", false, "Exit non-zero when any benchmark fails")
-		skipCPUFlag         = flag.Bool("skip-cpu", false, "Skip CPU benchmark")
-		skipMemoryFlag      = flag.Bool("skip-memory", false, "Skip memory benchmark")
-		skipDiskFlag        = flag.Bool("skip-disk", false, "Skip disk benchmark")
-		skipNetworkFlag     = flag.Bool("skip-network", false, "Skip network benchmark")
-		cpuDurationFlag     = flag.Int("cpu-duration-sec", defaultCPUDurationSec, "CPU benchmark duration in seconds")
-		memoryDurationFlag  = flag.Int("memory-duration-sec", defaultMemoryDurationSec, "Total memory benchmark duration in seconds")
-		memorySizeFlag      = flag.String("memory-size", "", "Memory benchmark buffer size (for example: 64MiB, 1GiB)")
-		diskSizeFlag        = flag.String("disk-size", "", "Disk benchmark file size (for example: 256MiB, 2GiB)")
-		diskBlockSizeFlag   = flag.String("disk-block-size", "1MiB", "Disk I/O block size")
-		diskDirFlag         = flag.String("disk-dir", "", "Directory used for temporary disk benchmark file")
-		networkDurationFlag = flag.Int("network-duration-sec", defaultNetworkDurationSec, "Network benchmark duration in seconds")
-		networkStreamsFlag  = flag.Int("network-streams", 4, "Parallel HTTP streams for network benchmark")
-		downloadURLFlag     = flag.String("network-download-url", defaultDownloadURL, "HTTP download endpoint")
-		uploadURLFlag       = flag.String("network-upload-url", defaultUploadURL, "HTTP upload endpoint")
-		uploadSizeFlag      = flag.String("network-upload-size", "4MiB", "Upload payload size per request")
-		httpTimeoutFlag     = flag.Int("http-timeout-sec", defaultHTTPTimeoutSec, "Per-request HTTP timeout in seconds")
+		jsonOnlyFlag        = flag.Bool("json", false, "仅输出 JSON 报告")
+		outputFlag          = flag.String("out", "", "将 JSON 报告写入文件")
+		strictFlag          = flag.Bool("strict", false, "任一测试失败时返回非 0 退出码")
+		skipCPUFlag         = flag.Bool("skip-cpu", false, "跳过 CPU 测试")
+		skipMemoryFlag      = flag.Bool("skip-memory", false, "跳过内存测试")
+		skipDiskFlag        = flag.Bool("skip-disk", false, "跳过磁盘测试")
+		skipNetworkFlag     = flag.Bool("skip-network", false, "跳过网络测试")
+		cpuDurationFlag     = flag.Int("cpu-duration-sec", defaultCPUDurationSec, "CPU 测试时长，单位秒")
+		memoryDurationFlag  = flag.Int("memory-duration-sec", defaultMemoryDurationSec, "内存测试总时长，单位秒")
+		memorySizeFlag      = flag.String("memory-size", "", "内存测试缓冲区大小，例如 64MiB、1GiB")
+		diskSizeFlag        = flag.String("disk-size", "", "磁盘测试文件大小，例如 256MiB、2GiB")
+		diskBlockSizeFlag   = flag.String("disk-block-size", "1MiB", "磁盘 I/O 块大小")
+		diskDirFlag         = flag.String("disk-dir", "", "磁盘测试临时文件目录")
+		networkDurationFlag = flag.Int("network-duration-sec", defaultNetworkDurationSec, "网络测试时长，单位秒")
+		networkStreamsFlag  = flag.Int("network-streams", 4, "网络测试并发 HTTP 流数量")
+		downloadURLFlag     = flag.String("network-download-url", defaultDownloadURL, "HTTP 下载测速地址")
+		uploadURLFlag       = flag.String("network-upload-url", defaultUploadURL, "HTTP 上传测速地址")
+		uploadSizeFlag      = flag.String("network-upload-size", "4MiB", "每次上传请求的负载大小")
+		httpTimeoutFlag     = flag.Int("http-timeout-sec", defaultHTTPTimeoutSec, "单次 HTTP 请求超时秒数")
 	)
 	flag.Parse()
 
@@ -171,12 +171,12 @@ func main() {
 
 	jsonBytes, err := json.MarshalIndent(rep, "", "  ")
 	if err != nil {
-		exitWithError(fmt.Sprintf("marshal report failed: %v", err))
+		exitWithError(fmt.Sprintf("序列化报告失败：%v", err))
 	}
 
 	if cfg.OutputPath != "" {
 		if err := os.WriteFile(cfg.OutputPath, jsonBytes, 0644); err != nil {
-			exitWithError(fmt.Sprintf("write %s failed: %v", cfg.OutputPath, err))
+			exitWithError(fmt.Sprintf("写入 %s 失败：%v", cfg.OutputPath, err))
 		}
 	}
 
@@ -214,49 +214,49 @@ func buildConfig(
 	httpTimeoutSec int,
 ) (config, error) {
 	if cpuDurationSec <= 0 {
-		return config{}, fmt.Errorf("-cpu-duration-sec must be > 0")
+		return config{}, fmt.Errorf("-cpu-duration-sec 必须大于 0")
 	}
 	if memoryDurationSec <= 0 {
-		return config{}, fmt.Errorf("-memory-duration-sec must be > 0")
+		return config{}, fmt.Errorf("-memory-duration-sec 必须大于 0")
 	}
 	if networkDurationSec <= 0 {
-		return config{}, fmt.Errorf("-network-duration-sec must be > 0")
+		return config{}, fmt.Errorf("-network-duration-sec 必须大于 0")
 	}
 	if networkStreams <= 0 {
-		return config{}, fmt.Errorf("-network-streams must be > 0")
+		return config{}, fmt.Errorf("-network-streams 必须大于 0")
 	}
 	if httpTimeoutSec <= 0 {
-		return config{}, fmt.Errorf("-http-timeout-sec must be > 0")
+		return config{}, fmt.Errorf("-http-timeout-sec 必须大于 0")
 	}
 
 	memoryBytes, err := resolveByteFlag(memorySizeRaw, defaultMemoryBufferBytes(system.TotalMemoryBytes))
 	if err != nil {
-		return config{}, fmt.Errorf("invalid -memory-size: %w", err)
+		return config{}, fmt.Errorf("-memory-size 参数无效：%w", err)
 	}
 	diskBytes, err := resolveByteFlag(diskSizeRaw, defaultDiskFileBytes(system.TotalMemoryBytes))
 	if err != nil {
-		return config{}, fmt.Errorf("invalid -disk-size: %w", err)
+		return config{}, fmt.Errorf("-disk-size 参数无效：%w", err)
 	}
 	diskBlockBytes64, err := resolveByteFlag(diskBlockRaw, 1<<20)
 	if err != nil {
-		return config{}, fmt.Errorf("invalid -disk-block-size: %w", err)
+		return config{}, fmt.Errorf("-disk-block-size 参数无效：%w", err)
 	}
 	uploadBytes64, err := resolveByteFlag(uploadSizeRaw, 4<<20)
 	if err != nil {
-		return config{}, fmt.Errorf("invalid -network-upload-size: %w", err)
+		return config{}, fmt.Errorf("-network-upload-size 参数无效：%w", err)
 	}
 
 	if memoryBytes <= 0 {
-		return config{}, fmt.Errorf("-memory-size must be > 0")
+		return config{}, fmt.Errorf("-memory-size 必须大于 0")
 	}
 	if diskBytes <= 0 {
-		return config{}, fmt.Errorf("-disk-size must be > 0")
+		return config{}, fmt.Errorf("-disk-size 必须大于 0")
 	}
 	if diskBlockBytes64 <= 0 {
-		return config{}, fmt.Errorf("-disk-block-size must be > 0")
+		return config{}, fmt.Errorf("-disk-block-size 必须大于 0")
 	}
 	if uploadBytes64 <= 0 {
-		return config{}, fmt.Errorf("-network-upload-size must be > 0")
+		return config{}, fmt.Errorf("-network-upload-size 必须大于 0")
 	}
 	if diskBlockBytes64 > diskBytes {
 		diskBlockBytes64 = diskBytes
@@ -303,7 +303,7 @@ func buildConfig(
 func runBenchmarks(cfg config, system systemInfo) report {
 	hostname, err := os.Hostname()
 	if err != nil || strings.TrimSpace(hostname) == "" {
-		hostname = "unknown"
+		hostname = "未知"
 	}
 
 	rep := report{
@@ -330,7 +330,7 @@ func runBenchmarks(cfg config, system systemInfo) report {
 		res := benchmarkCPU(cfg.CPUDuration, runtime.GOMAXPROCS(0))
 		rep.CPU = &res
 		if res.Error != "" {
-			rep.Errors = append(rep.Errors, "cpu: "+res.Error)
+			rep.Errors = append(rep.Errors, "CPU："+res.Error)
 		}
 	}
 
@@ -338,7 +338,7 @@ func runBenchmarks(cfg config, system systemInfo) report {
 		res := benchmarkMemory(cfg.MemoryDuration, cfg.MemoryBufferBytes)
 		rep.Memory = &res
 		if res.Error != "" {
-			rep.Errors = append(rep.Errors, "memory: "+res.Error)
+			rep.Errors = append(rep.Errors, "内存："+res.Error)
 		}
 	}
 
@@ -346,7 +346,7 @@ func runBenchmarks(cfg config, system systemInfo) report {
 		res := benchmarkDisk(cfg.DiskDir, cfg.DiskFileBytes, cfg.DiskBlockBytes)
 		rep.Disk = &res
 		if res.Error != "" {
-			rep.Errors = append(rep.Errors, "disk: "+res.Error)
+			rep.Errors = append(rep.Errors, "磁盘："+res.Error)
 		}
 	}
 
@@ -354,10 +354,10 @@ func runBenchmarks(cfg config, system systemInfo) report {
 		res := benchmarkNetwork(cfg)
 		rep.Network = &res
 		if res.Download.Error != "" {
-			rep.Errors = append(rep.Errors, "network download: "+res.Download.Error)
+			rep.Errors = append(rep.Errors, "网络下载："+res.Download.Error)
 		}
 		if res.Upload.Error != "" {
-			rep.Errors = append(rep.Errors, "network upload: "+res.Upload.Error)
+			rep.Errors = append(rep.Errors, "网络上传："+res.Upload.Error)
 		}
 	}
 
@@ -373,7 +373,7 @@ func resolveByteFlag(raw string, defaultValue int64) (int64, error) {
 
 func ensureAllocFitsInt(name string, value int64) error {
 	if value > int64(^uint(0)>>1) {
-		return fmt.Errorf("-%s is too large for this platform", name)
+		return fmt.Errorf("-%s 对当前平台来说过大", name)
 	}
 	return nil
 }
@@ -425,6 +425,6 @@ func alignDown(v, align int64) int64 {
 }
 
 func exitWithError(msg string) {
-	fmt.Fprintln(os.Stderr, "error:", msg)
+	fmt.Fprintln(os.Stderr, "错误：", msg)
 	os.Exit(1)
 }

@@ -60,11 +60,11 @@ func benchmarkDownload(client *http.Client, rawURL string, duration time.Duratio
 	}
 
 	if strings.TrimSpace(rawURL) == "" {
-		result.Error = "download url is empty"
+		result.Error = "下载地址不能为空"
 		return result
 	}
 	if duration <= 0 {
-		result.Error = "download duration must be > 0"
+		result.Error = "下载测试时长必须大于 0"
 		return result
 	}
 
@@ -115,7 +115,7 @@ func benchmarkDownload(client *http.Client, rawURL string, duration time.Duratio
 				if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 					body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
 					resp.Body.Close()
-					setError(fmt.Errorf("download returned %s: %s", resp.Status, strings.TrimSpace(string(body))))
+					setError(fmt.Errorf("下载请求返回 %s：%s", resp.Status, strings.TrimSpace(string(body))))
 					return
 				}
 
@@ -144,10 +144,10 @@ func benchmarkDownload(client *http.Client, rawURL string, duration time.Duratio
 	result.ThroughputMbps = round2(bitsPerSecondMbps(totalBytes, elapsed))
 	result.Error = firstErr
 	if result.Error == "" && ctx.Err() == context.DeadlineExceeded && totalBytes == 0 {
-		result.Error = "download timed out without a successful transfer"
+		result.Error = "下载测试超时，且没有成功传输数据"
 	}
 	if totalBytes == 0 && result.Error == "" {
-		result.Error = "no data downloaded"
+		result.Error = "没有下载到有效数据"
 	}
 
 	return result
@@ -159,15 +159,15 @@ func benchmarkUpload(client *http.Client, rawURL string, duration time.Duration,
 	}
 
 	if strings.TrimSpace(rawURL) == "" {
-		result.Error = "upload url is empty"
+		result.Error = "上传地址不能为空"
 		return result
 	}
 	if duration <= 0 {
-		result.Error = "upload duration must be > 0"
+		result.Error = "上传测试时长必须大于 0"
 		return result
 	}
 	if payloadBytes <= 0 {
-		result.Error = "upload payload size must be > 0"
+		result.Error = "上传负载大小必须大于 0"
 		return result
 	}
 
@@ -223,7 +223,7 @@ func benchmarkUpload(client *http.Client, rawURL string, duration time.Duration,
 				_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
 				resp.Body.Close()
 				if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-					setError(fmt.Errorf("upload returned %s", resp.Status))
+					setError(fmt.Errorf("上传请求返回 %s", resp.Status))
 					return
 				}
 
@@ -242,10 +242,10 @@ func benchmarkUpload(client *http.Client, rawURL string, duration time.Duration,
 	result.ThroughputMbps = round2(bitsPerSecondMbps(totalBytes, elapsed))
 	result.Error = firstErr
 	if result.Error == "" && ctx.Err() == context.DeadlineExceeded && totalBytes == 0 {
-		result.Error = "upload timed out without a successful transfer"
+		result.Error = "上传测试超时，且没有成功传输数据"
 	}
 	if totalBytes == 0 && result.Error == "" {
-		result.Error = "no data uploaded"
+		result.Error = "没有上传到有效数据"
 	}
 
 	return result

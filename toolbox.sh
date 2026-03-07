@@ -13,9 +13,9 @@ ensure_interactive_tty() {
     return 0
   fi
 
-  echo "[toolbox] no interactive TTY detected"
-  echo "[toolbox] run this script again in an interactive shell:"
-  echo "[toolbox]   cd ${ROOT_DIR} && ./toolbox.sh"
+  echo "[工具箱] 未检测到可交互的终端"
+  echo "[工具箱] 请在交互式终端中重新运行："
+  echo "[工具箱]   cd ${ROOT_DIR} && ./toolbox.sh"
   exit 1
 }
 
@@ -24,23 +24,23 @@ clear_screen() {
 }
 
 pause_for_enter() {
-  printf '\nPress Enter to return to the main menu...'
+  printf '\n按 Enter 返回主菜单...'
   read -r _ || true
 }
 
 print_header() {
   cat <<'EOF'
-VPS Tools
+VPS 工具包 - 终端面板
 ========================================================
-1) Route and Latency Probe
-   Measure outbound/return route and latency.
+1) 去程回程线路探测
+   测量本机到目标 IP 的去程/回程线路名称与延迟。
 
-2) VPS Bench
-   Benchmark CPU, memory, disk I/O, and network throughput.
+2) VPS 参数测试
+   一键测试 CPU、内存、磁盘 I/O 与网络吞吐。
 
-0) Exit
+0) 退出
 
-Each tool installs or checks its own required dependencies when it starts.
+进入对应工具后，会自动检查并安装该工具所需依赖。
 EOF
   printf '\n'
 }
@@ -50,7 +50,7 @@ ensure_module_bootstrap() {
   local bootstrap="${module_dir}/bootstrap.sh"
 
   if [[ ! -f "$bootstrap" ]]; then
-    echo "[toolbox] bootstrap not found: $bootstrap"
+    echo "[工具箱] 未找到启动脚本：$bootstrap"
     return 1
   fi
 
@@ -81,7 +81,7 @@ main_menu() {
   while true; do
     clear_screen
     print_header
-    printf 'Select a tool: '
+    printf '请选择编号：'
 
     local choice
     if ! read -r choice; then
@@ -93,14 +93,14 @@ main_menu() {
       1)
         if ! run_routeprobe; then
           echo
-          echo "[toolbox] route probe failed"
+          echo "[工具箱] 线路探测启动失败"
           pause_for_enter
         fi
         ;;
       2)
         if ! run_vpsbench; then
           echo
-          echo "[toolbox] VPS bench failed"
+          echo "[工具箱] VPS 参数测试启动失败"
         fi
         pause_for_enter
         ;;
@@ -109,7 +109,7 @@ main_menu() {
         ;;
       *)
         echo
-        echo "[toolbox] invalid selection: ${choice}"
+        echo "[工具箱] 无效选择：${choice}"
         pause_for_enter
         ;;
     esac

@@ -17,22 +17,22 @@ func benchmarkDisk(dir string, fileBytes int64, blockBytes int) diskResult {
 	}
 
 	if fileBytes <= 0 {
-		result.Error = "file size must be > 0"
+		result.Error = "测试文件大小必须大于 0"
 		return result
 	}
 	if blockBytes <= 0 {
-		result.Error = "block size must be > 0"
+		result.Error = "块大小必须大于 0"
 		return result
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		result.Error = fmt.Sprintf("prepare directory failed: %v", err)
+		result.Error = fmt.Sprintf("准备测试目录失败：%v", err)
 		return result
 	}
 
 	file, err := os.CreateTemp(dir, "vpsbench-*.bin")
 	if err != nil {
-		result.Error = fmt.Sprintf("create temp file failed: %v", err)
+		result.Error = fmt.Sprintf("创建临时文件失败：%v", err)
 		return result
 	}
 	path := file.Name()
@@ -53,7 +53,7 @@ func benchmarkDisk(dir string, fileBytes int64, blockBytes int) diskResult {
 		n, writeErr := file.Write(buffer[:chunk])
 		if writeErr != nil {
 			file.Close()
-			result.Error = fmt.Sprintf("write %s failed: %v", filepath.Base(path), writeErr)
+			result.Error = fmt.Sprintf("写入 %s 失败：%v", filepath.Base(path), writeErr)
 			return result
 		}
 		written += int64(n)
@@ -62,20 +62,20 @@ func benchmarkDisk(dir string, fileBytes int64, blockBytes int) diskResult {
 	fsyncStart := time.Now()
 	if err := file.Sync(); err != nil {
 		file.Close()
-		result.Error = fmt.Sprintf("fsync %s failed: %v", filepath.Base(path), err)
+		result.Error = fmt.Sprintf("fsync %s 失败：%v", filepath.Base(path), err)
 		return result
 	}
 	fsyncElapsed := time.Since(fsyncStart)
 	writeElapsed := time.Since(writeStart)
 
 	if err := file.Close(); err != nil {
-		result.Error = fmt.Sprintf("close %s failed: %v", filepath.Base(path), err)
+		result.Error = fmt.Sprintf("关闭 %s 失败：%v", filepath.Base(path), err)
 		return result
 	}
 
 	reader, err := os.Open(path)
 	if err != nil {
-		result.Error = fmt.Sprintf("reopen %s failed: %v", filepath.Base(path), err)
+		result.Error = fmt.Sprintf("重新打开 %s 失败：%v", filepath.Base(path), err)
 		return result
 	}
 	defer reader.Close()
@@ -84,7 +84,7 @@ func benchmarkDisk(dir string, fileBytes int64, blockBytes int) diskResult {
 	readBytes, err := io.CopyBuffer(io.Discard, reader, buffer)
 	readElapsed := time.Since(readStart)
 	if err != nil && !errors.Is(err, io.EOF) {
-		result.Error = fmt.Sprintf("read %s failed: %v", filepath.Base(path), err)
+		result.Error = fmt.Sprintf("读取 %s 失败：%v", filepath.Base(path), err)
 		return result
 	}
 

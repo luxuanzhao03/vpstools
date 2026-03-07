@@ -8,11 +8,11 @@ func benchmarkMemory(duration time.Duration, bufferBytes int64) memoryResult {
 	}
 
 	if duration <= 0 {
-		result.Error = "duration must be > 0"
+		result.Error = "测试时长必须大于 0"
 		return result
 	}
 	if bufferBytes <= 0 {
-		result.Error = "buffer size must be > 0"
+		result.Error = "缓冲区大小必须大于 0"
 		return result
 	}
 
@@ -42,7 +42,7 @@ func benchmarkMemory(duration time.Duration, bufferBytes int64) memoryResult {
 	result.FillGiBPS = round2(bytesPerSecondGiB(fillBytes, fillElapsed))
 
 	if copyBytes == 0 || fillBytes == 0 {
-		result.Error = "memory loop did not move any bytes"
+		result.Error = "内存测试未产生有效数据"
 	}
 
 	return result

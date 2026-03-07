@@ -1,66 +1,60 @@
-﻿# VPS Tools
+# VPS 工具包
 
-A terminal based toolkit for VPS operations.
-Current release includes route probing, one-command VPS benchmarking, and a unified interactive toolbox entrypoint.
+一个面向 VPS 运维与测试的终端工具集。
+当前版本提供统一工具箱入口，内置线路延迟测试与 VPS 参数测试两个模块。
 
-## Current Modules
+## 当前模块
 
-- `01-routeprobe`: outbound and return route identification + latency measurement
-- `02-vpsbench`: one-command CPU / memory / disk I/O / network throughput benchmark
-- Runtime: terminal-based tools inside VPS (via SSH)
-- User type: non technical users can run it by following prompts
+- `01-routeprobe`：去程/回程线路识别与延迟测试
+- `02-vpsbench`：一键测试 CPU、内存、磁盘 I/O、网络吞吐
+- 运行方式：SSH 终端内交互使用
+- 适用人群：非技术用户也可以按提示完成测试
 
-## One Line Install + Run
+## 一键安装并进入主界面
 
-Recommended one-liner (auto clone/update and enter the toolbox main menu):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/<your-username>/<your-repo>/main/onekey.sh | bash -s -- https://github.com/<your-username>/<your-repo>.git
-```
-
-If you set your real repo URL as default inside `onekey.sh`, users can run an even shorter command:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/<your-username>/<your-repo>/main/onekey.sh | bash
-```
-
-## Quick Start
-One-line install and start the toolbox main menu:
+推荐命令：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luxuanzhao03/vpstools/main/onekey.sh | bash
 ```
 
-The toolbox main menu lets users choose the route probe or the VPS benchmark, and each module auto-installs its own required dependencies when launched.
+执行后会自动：
 
-Manual start from a cloned repo:
+- 安装或检查 `git`
+- 克隆或更新仓库
+- 进入工具箱主界面
+- 由用户选择运行线路测试或 VPS 参数测试
+
+## 手动启动
+
+如果你已经克隆了仓库，可以直接运行工具箱主界面：
 
 ```bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/luxuanzhao03/vpstools.git
+cd vpstools
 chmod +x toolbox.sh
 ./toolbox.sh
 ```
 
-Start the route probe module directly:
+也可以直接启动某个模块。
+
+线路测试模块：
 
 ```bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>/tools/01-routeprobe
+cd tools/01-routeprobe
 chmod +x bootstrap.sh
 ./bootstrap.sh --run-panel
 ```
 
-Start the benchmark module directly:
+VPS 参数测试模块：
 
 ```bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>/tools/02-vpsbench
+cd tools/02-vpsbench
 chmod +x bootstrap.sh
 ./bootstrap.sh
 ```
 
-## Repository Structure
+## 仓库结构
 
 ```text
 .
@@ -71,23 +65,22 @@ chmod +x bootstrap.sh
 └─ README.md
 ```
 
-## Documentation
+## 模块说明
 
 - [tools/01-routeprobe/README.md](tools/01-routeprobe/README.md)
 - [tools/02-vpsbench/README.md](tools/02-vpsbench/README.md)
 
-## Roadmap
+## 路线图
 
-- [x] Route and latency probe
-- [x] CPU / memory / disk I/O / network throughput benchmark
-- [ ] More VPS network tools
-- [ ] More system inspection tools
-- [ ] One click O&M helpers
+- [x] 线路识别与延迟测试
+- [x] CPU / 内存 / 磁盘 I/O / 网络吞吐测试
+- [ ] 更多网络测试工具
+- [ ] 更多系统巡检工具
+- [ ] 一键运维辅助工具
 
-## License
+## 许可证
 
-MIT License:
+MIT License：
 
 - [tools/01-routeprobe/LICENSE](tools/01-routeprobe/LICENSE)
 - [tools/02-vpsbench/LICENSE](tools/02-vpsbench/LICENSE)
-

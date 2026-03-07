@@ -19,7 +19,7 @@ func benchmarkCPU(duration time.Duration, workers int) cpuResult {
 		result.Workers = 1
 	}
 	if duration <= 0 {
-		result.Error = "duration must be > 0"
+		result.Error = "测试时长必须大于 0"
 		return result
 	}
 
@@ -44,7 +44,7 @@ func benchmarkCPU(duration time.Duration, workers int) cpuResult {
 	result.MultiCoreMiBPS = round2(bytesPerSecondMiB(multiBytes, multiElapsed))
 
 	if singleIterations == 0 || multiIterations == 0 {
-		result.Error = "sha256 worker did not complete any iterations"
+		result.Error = "SHA256 测试未完成有效迭代"
 	}
 
 	return result
