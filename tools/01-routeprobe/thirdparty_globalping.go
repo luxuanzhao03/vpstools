@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -146,12 +147,12 @@ func globalpingWaitMeasurement(measurementID string, cfg config) (map[string]int
 	var lastBody string
 	var lastErr error
 
-	for time.Now().Before(deadline) {
+	for attempt := 0; time.Now().Before(deadline); attempt++ {
 		result, bodyText, err := globalpingFetchMeasurement(measurementID, cfg)
 		if err != nil {
 			lastErr = err
 			lastBody = bodyText
-			time.Sleep(2 * time.Second)
+			time.Sleep(globalpingPollInterval(attempt))
 			continue
 		}
 
@@ -163,13 +164,13 @@ func globalpingWaitMeasurement(measurementID string, cfg config) (map[string]int
 			if results := interfaceSlice(result["results"]); len(results) > 0 {
 				return result, bodyText, nil
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(globalpingPollInterval(attempt))
 			continue
 		}
 
 		switch status {
 		case "in-progress", "in_progress", "pending", "running", "created":
-			time.Sleep(2 * time.Second)
+			time.Sleep(globalpingPollInterval(attempt))
 			continue
 		case "finished", "done", "completed", "success", "succeeded":
 			return result, bodyText, nil
@@ -179,7 +180,7 @@ func globalpingWaitMeasurement(measurementID string, cfg config) (map[string]int
 			if results := interfaceSlice(result["results"]); len(results) > 0 {
 				return result, bodyText, nil
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(globalpingPollInterval(attempt))
 			continue
 		}
 	}
@@ -188,6 +189,13 @@ func globalpingWaitMeasurement(measurementID string, cfg config) (map[string]int
 		return lastMap, lastBody, fmt.Errorf("wait measurement timeout: %v", lastErr)
 	}
 	return lastMap, lastBody, fmt.Errorf("wait measurement timeout")
+}
+
+func globalpingPollInterval(attempt int) time.Duration {
+	if attempt < 2 {
+		return time.Second
+	}
+	return 2 * time.Second
 }
 
 func globalpingFetchMeasurement(measurementID string, cfg config) (map[string]interface{}, string, error) {
@@ -234,7 +242,10 @@ func globalpingRequest(method, url, token string, payload interface{}, timeoutSe
 		bodyReader = bytes.NewReader(jsonBytes)
 	}
 
-	req, err := http.NewRequest(method, url, bodyReader)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -246,8 +257,7 @@ func globalpingRequest(method, url, token string, payload interface{}, timeoutSe
 		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
 	}
 
-	client := &http.Client{Timeout: time.Duration(timeoutSec) * time.Second}
-	resp, err := client.Do(req)
+	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
 		return 0, nil, err
 	}

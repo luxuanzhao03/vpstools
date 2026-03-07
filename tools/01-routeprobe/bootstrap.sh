@@ -7,15 +7,14 @@ INSTALL_GO_VERSION="${INSTALL_GO_VERSION:-1.22.12}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() {
-  printf "[bootstrap] %s\n" "$*"
+  printf '[bootstrap] %s\n' "$*"
 }
 
 err() {
-  printf "[bootstrap] 错误：%s\n" "$*" >&2
+  printf '[bootstrap] 错误: %s\n' "$*" >&2
 }
 
 version_ge() {
-  # Returns 0 when $1 >= $2
   [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
 }
 
@@ -32,18 +31,21 @@ detect_go_version() {
   fi
 
   printf '%s' "$raw"
-  return 0
 }
 
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
-  elif command -v sudo >/dev/null 2>&1; then
-    sudo "$@"
-  else
-    err "执行该操作需要 root 或 sudo 权限：$*"
-    return 1
+    return 0
   fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+    return 0
+  fi
+
+  err "当前操作需要 root 或 sudo 权限"
+  return 1
 }
 
 pm_name() {
@@ -111,7 +113,7 @@ pm_install() {
       run_as_root apk add --no-cache "${pkgs[@]}"
       ;;
     *)
-      err "不支持的包管理器：$pm"
+      err "不支持的包管理器: $pm"
       return 1
       ;;
   esac
@@ -120,7 +122,7 @@ pm_install() {
 install_go_via_package_manager() {
   local pm pkg current
   if ! pm="$(pm_name)"; then
-  log "未找到包管理器，跳过包管理器安装路径"
+    log "未识别到包管理器，跳过系统包安装路径"
     return 1
   fi
 
@@ -131,12 +133,9 @@ install_go_via_package_manager() {
     apt-get)
       for pkg in golang-go golang; do
         if pm_install "$pm" "$pkg"; then
-          if current="$(detect_go_version)"; then
-            if version_ge "$current" "$REQUIRED_GO_VERSION"; then
-              log "Go 已就绪：${current}"
-              return 0
-            fi
-            log "包管理器提供的 Go 版本过低：${current}"
+          if current="$(detect_go_version)" && version_ge "$current" "$REQUIRED_GO_VERSION"; then
+            log "Go 已就绪: ${current}"
+            return 0
           fi
         fi
       done
@@ -144,12 +143,9 @@ install_go_via_package_manager() {
     dnf|yum|zypper|pacman|apk)
       for pkg in golang go; do
         if pm_install "$pm" "$pkg"; then
-          if current="$(detect_go_version)"; then
-            if version_ge "$current" "$REQUIRED_GO_VERSION"; then
-              log "Go 已就绪：${current}"
-              return 0
-            fi
-            log "包管理器提供的 Go 版本过低：${current}"
+          if current="$(detect_go_version)" && version_ge "$current" "$REQUIRED_GO_VERSION"; then
+            log "Go 已就绪: ${current}"
+            return 0
           fi
         fi
       done
@@ -166,11 +162,11 @@ ensure_fetch_tools() {
   fi
 
   if ! pm="$(pm_name)"; then
-    err "既没有 curl/wget，也没有可识别的包管理器"
+    err "既没有 curl/wget，也没有可用的包管理器"
     return 1
   fi
 
-  log "未检测到 curl/wget，正在安装下载工具"
+  log "未检测到 curl 或 wget，正在安装下载工具"
   pm_update_if_needed "$pm"
   pm_install "$pm" curl wget ca-certificates tar
 }
@@ -200,13 +196,19 @@ install_go_official() {
 
   case "$os" in
     linux) ;;
-    *) err "当前系统不支持 tarball 安装 Go：$os"; return 1 ;;
+    *)
+      err "当前系统不支持自动下载安装 Go: $os"
+      return 1
+      ;;
   esac
 
   case "$arch" in
     x86_64|amd64) arch="amd64" ;;
     aarch64|arm64) arch="arm64" ;;
-    *) err "当前架构不支持 tarball 安装 Go：$arch"; return 1 ;;
+    *)
+      err "当前架构不支持自动下载安装 Go: $arch"
+      return 1
+      ;;
   esac
 
   ensure_fetch_tools
@@ -214,7 +216,6 @@ install_go_official() {
   tmpdir="$(mktemp -d)"
   tarball="${tmpdir}/go.tgz"
 
-  # Try multiple mirrors, prioritizing China-friendly ones.
   for url in \
     "https://golang.google.cn/dl/go${INSTALL_GO_VERSION}.${os}-${arch}.tar.gz" \
     "https://mirrors.aliyun.com/golang/go${INSTALL_GO_VERSION}.${os}-${arch}.tar.gz" \
@@ -222,20 +223,15 @@ install_go_official() {
     "https://mirrors.ustc.edu.cn/golang/go${INSTALL_GO_VERSION}.${os}-${arch}.tar.gz" \
     "https://go.dev/dl/go${INSTALL_GO_VERSION}.${os}-${arch}.tar.gz" \
     "https://dl.google.com/go/go${INSTALL_GO_VERSION}.${os}-${arch}.tar.gz"; do
-
     rm -f "$tarball"
-    log "尝试下载：${url}"
+    log "尝试下载: ${url}"
     if ! download_file "$url" "$tarball"; then
       continue
     fi
-
     if [ ! -s "$tarball" ]; then
-      log "下载文件为空，跳过"
       continue
     fi
-
     if ! tar -tzf "$tarball" >/dev/null 2>&1; then
-      log "下载的压缩包无效，跳过"
       continue
     fi
 
@@ -246,21 +242,13 @@ install_go_official() {
     if [ -x /usr/local/go/bin/go ]; then
       run_as_root ln -sf /usr/local/go/bin/go /usr/local/bin/go
       run_as_root ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+      export PATH="/usr/local/go/bin:${PATH}"
     fi
-
-    rm -rf "$tmpdir"
 
     if current="$(detect_go_version)" && version_ge "$current" "$REQUIRED_GO_VERSION"; then
-      log "Go 已就绪：${current}"
+      rm -rf "$tmpdir"
+      log "Go 已就绪: ${current}"
       return 0
-    fi
-
-    if [ -x /usr/local/go/bin/go ]; then
-      export PATH="/usr/local/go/bin:${PATH}"
-      if current="$(detect_go_version)" && version_ge "$current" "$REQUIRED_GO_VERSION"; then
-        log "Go 已就绪：${current}"
-        return 0
-      fi
     fi
   done
 
@@ -273,10 +261,10 @@ ensure_go() {
 
   if current="$(detect_go_version)"; then
     if version_ge "$current" "$REQUIRED_GO_VERSION"; then
-      log "已检测到 Go：${current}（满足 >= ${REQUIRED_GO_VERSION}）"
+      log "已检测到 Go ${current}"
       return 0
     fi
-    log "已检测到 Go，但版本过低：${current}（< ${REQUIRED_GO_VERSION}）"
+    log "检测到 Go ${current}，但版本低于 ${REQUIRED_GO_VERSION}"
   else
     log "未检测到 Go"
   fi
@@ -284,22 +272,45 @@ ensure_go() {
   if install_go_via_package_manager; then
     return 0
   fi
-
-  log "包管理器安装路径不可用或版本不足，尝试 tarball 镜像安装"
   if install_go_official; then
     return 0
   fi
 
-  err "无法自动安装 Go"
-  err "请手动安装 Go >= ${REQUIRED_GO_VERSION} 后重新运行"
+  err "无法自动安装 Go，请先安装 Go >= ${REQUIRED_GO_VERSION}"
+  return 1
+}
+
+needs_rebuild() {
+  local binary="${SCRIPT_DIR}/${APP_NAME}"
+
+  if [ ! -x "$binary" ]; then
+    return 0
+  fi
+
+  while IFS= read -r -d '' file; do
+    if [ "$file" -nt "$binary" ]; then
+      return 0
+    fi
+  done < <(
+    find "$SCRIPT_DIR" -maxdepth 1 \
+      \( -name '*.go' -o -name 'go.mod' -o -name 'go.sum' -o -name 'route_db.json' \) \
+      -print0
+  )
+
   return 1
 }
 
 build_binary() {
   cd "$SCRIPT_DIR"
+
+  if ! needs_rebuild; then
+    log "二进制已是最新，跳过重新构建"
+    return 0
+  fi
+
   log "正在构建 ${APP_NAME}"
   go build -o "$APP_NAME" .
-  log "构建完成：${SCRIPT_DIR}/${APP_NAME}"
+  log "构建完成: ${SCRIPT_DIR}/${APP_NAME}"
 }
 
 main() {
@@ -312,11 +323,11 @@ main() {
   build_binary
 
   if [ "$mode" = "run-panel" ]; then
-    log "正在启动终端面板"
+    log "正在启动线路延迟工具面板"
     exec "${SCRIPT_DIR}/${APP_NAME}" -panel
   fi
 
-  log "处理完成。下次可直接运行：./${APP_NAME} -panel"
+  log "处理完成，下次可直接运行: ./${APP_NAME} -panel"
 }
 
 main "$@"

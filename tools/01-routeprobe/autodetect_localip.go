@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +10,14 @@ import (
 	"strings"
 	"time"
 )
+
+type publicIPEndpointResult struct {
+	ip       string
+	source   string
+	insecure bool
+	url      string
+	err      error
+}
 
 func ensureReturnLocalIP(cfg *config) error {
 	if cfg == nil {
@@ -89,55 +98,88 @@ func detectPublicIPByHTTP() (string, string, error) {
 	}
 
 	client := &http.Client{Timeout: 4 * time.Second}
-	var lastErr error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	results := make(chan publicIPEndpointResult, len(endpoints))
 	for _, ep := range endpoints {
-		req, err := http.NewRequest(http.MethodGet, ep.url, nil)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		req.Header.Set("User-Agent", "routeprobe/1.0")
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		_ = resp.Body.Close()
-		if readErr != nil {
-			lastErr = readErr
-			continue
-		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			lastErr = fmt.Errorf("%s status %d", ep.url, resp.StatusCode)
-			continue
-		}
-
-		ip := firstIP(string(body))
-		if ip == "" {
-			lastErr = fmt.Errorf("%s no ip in response", ep.url)
-			continue
-		}
-		if !validIP(ip) {
-			lastErr = fmt.Errorf("%s returned invalid ip: %s", ep.url, ip)
-			continue
-		}
-		if !isLikelyPublicIP(ip) {
-			lastErr = fmt.Errorf("%s returned non-public ip: %s", ep.url, ip)
-			continue
-		}
-
-		if ep.insecure {
-			fmt.Fprintf(os.Stderr, "[warn] local-ip resolved via insecure HTTP endpoint: %s\n", ep.url)
-		}
-		return ip, "endpoint:" + ep.url, nil
+		ep := ep
+		go func() {
+			results <- detectPublicIPFromEndpoint(ctx, client, ep.url, ep.insecure)
+		}()
 	}
 
-	if lastErr == nil {
-		lastErr = fmt.Errorf("no endpoint available")
+	errs := make([]string, 0, len(endpoints))
+	for i := 0; i < len(endpoints); i++ {
+		result := <-results
+		if result.err == nil && result.ip != "" {
+			cancel()
+			if result.insecure {
+				fmt.Fprintf(os.Stderr, "[warn] local-ip resolved via insecure HTTP endpoint: %s\n", result.url)
+			}
+			return result.ip, result.source, nil
+		}
+		if result.err != nil {
+			errs = append(errs, result.err.Error())
+		}
 	}
-	return "", "", lastErr
+
+	if len(errs) == 0 {
+		return "", "", fmt.Errorf("no endpoint available")
+	}
+	return "", "", fmt.Errorf(strings.Join(errs, "; "))
+}
+
+func detectPublicIPFromEndpoint(ctx context.Context, client *http.Client, url string, insecure bool) publicIPEndpointResult {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return publicIPEndpointResult{url: url, err: err}
+	}
+	req.Header.Set("User-Agent", "routeprobe/1.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return publicIPEndpointResult{url: url, err: err}
+	}
+	defer resp.Body.Close()
+
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 2048))
+	if readErr != nil {
+		return publicIPEndpointResult{url: url, err: readErr}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return publicIPEndpointResult{
+			url: url,
+			err: fmt.Errorf("%s status %d", url, resp.StatusCode),
+		}
+	}
+
+	ip := firstIP(string(body))
+	if ip == "" {
+		return publicIPEndpointResult{
+			url: url,
+			err: fmt.Errorf("%s no ip in response", url),
+		}
+	}
+	if !validIP(ip) {
+		return publicIPEndpointResult{
+			url: url,
+			err: fmt.Errorf("%s returned invalid ip: %s", url, ip),
+		}
+	}
+	if !isLikelyPublicIP(ip) {
+		return publicIPEndpointResult{
+			url: url,
+			err: fmt.Errorf("%s returned non-public ip: %s", url, ip),
+		}
+	}
+
+	return publicIPEndpointResult{
+		ip:       ip,
+		source:   "endpoint:" + url,
+		insecure: insecure,
+		url:      url,
+	}
 }
 
 func detectOutboundRouteIP() string {

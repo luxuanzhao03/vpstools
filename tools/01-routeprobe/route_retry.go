@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 func runLocalTraceWithRetry(target string, cfg config) (traceResult, string) {
@@ -19,15 +20,37 @@ func runLocalTraceWithRetry(target string, cfg config) (traceResult, string) {
 		rawParts = append(rawParts, "# default\n"+raw)
 	}
 
-	for _, mode := range []string{"icmp", "tcp"} {
-		candidate, cRaw := runLocalTraceByMode(target, cfg, mode)
-		if strings.TrimSpace(cRaw) != "" {
-			rawParts = append(rawParts, "# "+mode+"\n"+cRaw)
+	modes := []string{"icmp", "tcp"}
+	type retryResult struct {
+		mode      string
+		trace     traceResult
+		rawOutput string
+	}
+
+	results := make([]retryResult, len(modes))
+	var wg sync.WaitGroup
+	for i, mode := range modes {
+		i := i
+		mode := mode
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			trace, traceRaw := runLocalTraceByMode(target, cfg, mode)
+			results[i] = retryResult{
+				mode:      mode,
+				trace:     trace,
+				rawOutput: traceRaw,
+			}
+		}()
+	}
+	wg.Wait()
+
+	for _, result := range results {
+		if strings.TrimSpace(result.rawOutput) != "" {
+			rawParts = append(rawParts, "# "+result.mode+"\n"+result.rawOutput)
 		}
-		best = pickBetterTrace(best, candidate)
-		if isRouteRecognized(best.Hops) {
-			break
-		}
+		best = pickBetterTrace(best, result.trace)
 	}
 
 	if !isRouteRecognized(best.Hops) {

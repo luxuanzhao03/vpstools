@@ -10,6 +10,10 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+timestamp() {
+  date +"%Y%m%d-%H%M%S"
+}
+
 run_root() {
   if [[ "$(id -u)" -eq 0 ]]; then
     "$@"
@@ -19,6 +23,35 @@ run_root() {
     echo "[onekey] 安装依赖需要 root 或 sudo 权限"
     exit 1
   fi
+}
+
+dirty_worktree() {
+  [[ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=all 2>/dev/null || true)" ]]
+}
+
+clone_repo() {
+  echo "[onekey] 正在克隆仓库到：$INSTALL_DIR"
+  git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+}
+
+refresh_repo_from_backup() {
+  local backup_dir="${INSTALL_DIR}.backup-$(timestamp)"
+
+  echo "[onekey] 检测到安装目录存在本地改动，无法直接覆盖更新"
+  echo "[onekey] 将当前目录备份到：$backup_dir"
+  mv "$INSTALL_DIR" "$backup_dir"
+
+  if clone_repo; then
+    echo "[onekey] 已使用全新副本完成更新"
+    echo "[onekey] 如确认旧目录无用，可手动删除：$backup_dir"
+    return 0
+  fi
+
+  echo "[onekey] 重新克隆失败，正在恢复原目录"
+  rm -rf "$INSTALL_DIR"
+  mv "$backup_dir" "$INSTALL_DIR"
+  echo "[onekey] 已恢复原目录，请检查网络或磁盘后重试"
+  exit 1
 }
 
 validate_install_dir() {
@@ -76,6 +109,11 @@ resolve_install_dir() {
 
 sync_repo() {
   if [[ -d "$INSTALL_DIR/.git" ]]; then
+    if dirty_worktree; then
+      refresh_repo_from_backup
+      return
+    fi
+
     echo "[onekey] 正在更新仓库：$INSTALL_DIR"
     git -C "$INSTALL_DIR" fetch origin "$BRANCH"
     git -C "$INSTALL_DIR" checkout "$BRANCH"
@@ -89,26 +127,24 @@ sync_repo() {
     exit 1
   fi
 
-  echo "[onekey] 正在克隆仓库到：$INSTALL_DIR"
-  git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  clone_repo
 }
 
 run_toolbox() {
   cd "$INSTALL_DIR"
-  chmod +x toolbox.sh
 
   if [[ -t 0 && -t 1 ]]; then
-    exec ./toolbox.sh
+    exec bash ./toolbox.sh
   fi
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     echo "[onekey] 检测到当前 stdin 非交互式，切换到 /dev/tty 打开工具箱"
-    exec ./toolbox.sh </dev/tty >/dev/tty
+    exec bash ./toolbox.sh </dev/tty >/dev/tty
   fi
 
   echo "[onekey] 未检测到可交互终端，暂时无法打开工具箱"
   echo "[onekey] 安装已完成，稍后可手动运行："
-  echo "[onekey]   cd $INSTALL_DIR && ./toolbox.sh"
+  echo "[onekey]   cd $INSTALL_DIR && bash ./toolbox.sh"
 }
 
 ensure_git

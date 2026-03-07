@@ -53,8 +53,6 @@ ensure_module_bootstrap() {
     echo "[工具箱] 未找到启动脚本：$bootstrap"
     return 1
   fi
-
-  chmod +x "$bootstrap"
 }
 
 run_routeprobe() {
@@ -62,7 +60,7 @@ run_routeprobe() {
   ensure_module_bootstrap "$module_dir"
   (
     cd "$module_dir"
-    ./bootstrap.sh --run-panel
+    bash ./bootstrap.sh --run-panel
   )
 }
 
@@ -71,7 +69,7 @@ run_vpsbench() {
   ensure_module_bootstrap "$module_dir"
   (
     cd "$module_dir"
-    ./bootstrap.sh
+    bash ./bootstrap.sh
   )
 }
 

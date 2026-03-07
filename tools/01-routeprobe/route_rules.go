@@ -57,13 +57,16 @@ func detectRouteByKeywords(pathText string) string {
 	if text == "" {
 		return ""
 	}
+	if cached, ok := loadCachedString(&routeKeywordLookupCache, text); ok {
+		return cached
+	}
 
 	for _, rule := range routeDetectRules {
 		if containsAnyLower(text, rule.Keywords) {
-			return rule.Name
+			return storeCachedString(&routeKeywordLookupCache, text, rule.Name)
 		}
 	}
-	return ""
+	return storeCachedString(&routeKeywordLookupCache, text, "")
 }
 
 func isChinaCarrierRoute(route string) bool {

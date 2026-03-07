@@ -213,55 +213,18 @@ func generateReport(cfg config, includeRaw bool) (report, error) {
 	if err := ensureLocalDependencies(cfg); err != nil {
 		return report{}, err
 	}
+	if err := prepareReverseDependencies(cfg); err != nil {
+		return report{}, err
+	}
 
 	hostname, _ := os.Hostname()
 	rep := report{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Hostname:  hostname,
 		LocalIP:   cfg.LocalIP,
-		Results:   make([]targetProbe, 0, len(cfg.Targets)),
+		Results:   make([]targetProbe, len(cfg.Targets)),
 	}
-
-	for _, target := range cfg.Targets {
-		res := targetProbe{Target: target}
-
-		outbound, rawOut := runLocalTraceWithRetry(target, cfg)
-		if includeRaw {
-			outbound.RawOutput = rawOut
-		}
-
-		if cfg.PingCount > 0 {
-			ping, pingCmd, pingRaw, pingErr := runLocalPing(target, cfg)
-			if pingCmd != "" {
-				outbound.Command = strings.TrimSpace(outbound.Command + " | " + pingCmd)
-			}
-			if pingErr != nil {
-				outbound.Error = joinErrors(outbound.Error, fmt.Sprintf("ping failed: %v", pingErr))
-			} else {
-				outbound.Ping = ping
-			}
-			if includeRaw && pingRaw != "" {
-				outbound.RawOutput = strings.TrimSpace(outbound.RawOutput + "\n\n# ping\n" + pingRaw)
-			}
-		}
-		res.Outbound = outbound
-
-		if endpoint, ok := cfg.ReverseSSH[target]; ok {
-			back, rawBack := runReverseTrace(endpoint, cfg.LocalIP, cfg)
-			if includeRaw {
-				back.RawOutput = rawBack
-			}
-			res.Return = &back
-		} else if cfg.ThirdPartyReturn {
-			back, rawBack := runThirdPartyReverseTraceWithRetry(target, cfg.LocalIP, cfg)
-			if includeRaw {
-				back.RawOutput = rawBack
-			}
-			res.Return = &back
-		}
-
-		rep.Results = append(rep.Results, res)
-	}
+	populateTargetProbes(rep.Results, cfg, includeRaw)
 
 	return rep, nil
 }
@@ -447,8 +410,17 @@ func ensureLocalDependencies(cfg config) error {
 }
 
 func ensureRemoteTraceroute(sshEndpoint string, cfg config) error {
+	sshEndpoint = strings.TrimSpace(sshEndpoint)
+	if sshEndpoint == "" {
+		return errors.New("remote ssh endpoint is empty")
+	}
+	if remoteTracerouteCached(sshEndpoint) {
+		return nil
+	}
+
 	checkCmd := "command -v traceroute >/dev/null 2>&1"
 	if _, err := runCommand("ssh", []string{sshEndpoint, checkCmd}, cfg.CommandTimeoutSec); err == nil {
+		rememberRemoteTraceroute(sshEndpoint)
 		return nil
 	}
 
@@ -470,6 +442,7 @@ func ensureRemoteTraceroute(sshEndpoint string, cfg config) error {
 	if _, err := runCommand("ssh", []string{sshEndpoint, checkCmd}, cfg.CommandTimeoutSec); err != nil {
 		return fmt.Errorf("traceroute still missing on remote %s after auto install", sshEndpoint)
 	}
+	rememberRemoteTraceroute(sshEndpoint)
 	return nil
 }
 
@@ -886,43 +859,46 @@ func validIP(s string) bool {
 }
 
 func classifyLineName(host, ip string) string {
-    host = strings.TrimSpace(host)
-    ip = strings.TrimSpace(ip)
+	host = strings.TrimSpace(host)
+	ip = strings.TrimSpace(ip)
 
-    if host == "*" {
-        return "Timeout"
-    }
+	cacheKey := joinCacheKey(host, ip)
+	if cached, ok := loadCachedString(&lineNameLookupCache, cacheKey); ok {
+		return cached
+	}
 
-    if ip != "" {
-        parsed := net.ParseIP(ip)
-        if parsed != nil {
-            if parsed.IsPrivate() || parsed.IsLoopback() || parsed.IsLinkLocalUnicast() {
-                return "Private Network"
-            }
-        }
-    }
+	if host == "*" {
+		return storeCachedString(&lineNameLookupCache, cacheKey, "Timeout")
+	}
 
-    text := strings.ToLower(strings.TrimSpace(host + " " + ip))
-    for _, rule := range lineRules {
-        if rule.Re.MatchString(text) {
-            return rule.Name
-        }
-    }
+	if ip != "" {
+		parsed := net.ParseIP(ip)
+		if parsed != nil && (parsed.IsPrivate() || parsed.IsLoopback() || parsed.IsLinkLocalUnicast()) {
+			return storeCachedString(&lineNameLookupCache, cacheKey, "Private Network")
+		}
+	}
 
-    if route := lookupRouteByTextDatabase(text); route != "" {
-        return route
-    }
-    if route := lookupRouteByIPDatabase(ip); route != "" {
-        return route
-    }
+	text := strings.ToLower(strings.TrimSpace(host + " " + ip))
+	for _, rule := range lineRules {
+		if rule.Re.MatchString(text) {
+			return storeCachedString(&lineNameLookupCache, cacheKey, rule.Name)
+		}
+	}
 
-    if ip != "" {
-        return "AS/Carrier Unknown"
-    }
-    if host != "" {
-        return "Name Unknown"
-    }
-    return "Unknown"
+	if route := lookupRouteByTextDatabase(text); route != "" {
+		return storeCachedString(&lineNameLookupCache, cacheKey, route)
+	}
+	if route := lookupRouteByIPDatabase(ip); route != "" {
+		return storeCachedString(&lineNameLookupCache, cacheKey, route)
+	}
+
+	if ip != "" {
+		return storeCachedString(&lineNameLookupCache, cacheKey, "AS/Carrier Unknown")
+	}
+	if host != "" {
+		return storeCachedString(&lineNameLookupCache, cacheKey, "Name Unknown")
+	}
+	return storeCachedString(&lineNameLookupCache, cacheKey, "Unknown")
 }
 
 func inferDestinationRTT(hops []hopResult) float64 {

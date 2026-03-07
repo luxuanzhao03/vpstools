@@ -129,20 +129,23 @@ func lookupRouteByIPDatabase(ip string) string {
 	if ip == "" {
 		return ""
 	}
+	if cached, ok := loadCachedString(&routeIPLookupCache, ip); ok {
+		return cached
+	}
 
 	routeDBOnce.Do(initRouteDatabase)
 
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
-		return ""
+		return storeCachedString(&routeIPLookupCache, ip, "")
 	}
 
 	for _, rule := range routePrefixDB {
 		if rule.net.Contains(parsed) {
-			return rule.route
+			return storeCachedString(&routeIPLookupCache, ip, rule.route)
 		}
 	}
-	return ""
+	return storeCachedString(&routeIPLookupCache, ip, "")
 }
 
 func lookupRouteByTextDatabase(text string) string {
@@ -150,10 +153,14 @@ func lookupRouteByTextDatabase(text string) string {
 	if text == "" {
 		return ""
 	}
+	cacheKey := strings.ToLower(text)
+	if cached, ok := loadCachedString(&routeTextLookupCache, cacheKey); ok {
+		return cached
+	}
 
 	routeDBOnce.Do(initRouteDatabase)
 
-	for _, m := range asnTokenRe.FindAllStringSubmatch(strings.ToLower(text), -1) {
+	for _, m := range asnTokenRe.FindAllStringSubmatch(cacheKey, -1) {
 		if len(m) < 2 {
 			continue
 		}
@@ -162,10 +169,10 @@ func lookupRouteByTextDatabase(text string) string {
 			continue
 		}
 		if route := routeASNDB[asn]; route != "" {
-			return route
+			return storeCachedString(&routeTextLookupCache, cacheKey, route)
 		}
 	}
-	return ""
+	return storeCachedString(&routeTextLookupCache, cacheKey, "")
 }
 
 func normalizeRouteAlias(name string) string {
