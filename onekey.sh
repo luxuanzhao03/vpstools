@@ -93,25 +93,25 @@ sync_repo() {
   git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
 }
 
-run_panel() {
-  cd "$INSTALL_DIR/tools/01-routeprobe"
-  chmod +x bootstrap.sh
+run_toolbox() {
+  cd "$INSTALL_DIR"
+  chmod +x toolbox.sh
 
   if [[ -t 0 && -t 1 ]]; then
-    exec ./bootstrap.sh --run-panel
+    exec ./toolbox.sh
   fi
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
-    echo "[onekey] non-interactive stdin detected, switching panel to /dev/tty"
-    exec ./bootstrap.sh --run-panel </dev/tty >/dev/tty
+    echo "[onekey] non-interactive stdin detected, switching toolbox to /dev/tty"
+    exec ./toolbox.sh </dev/tty >/dev/tty
   fi
 
-  echo "[onekey] no interactive TTY detected, panel cannot be opened now"
+  echo "[onekey] no interactive TTY detected, toolbox cannot be opened now"
   echo "[onekey] installed successfully. run this command later:"
-  echo "[onekey]   cd $INSTALL_DIR/tools/01-routeprobe && ./bootstrap.sh --run-panel"
+  echo "[onekey]   cd $INSTALL_DIR && ./toolbox.sh"
 }
 
 ensure_git
 resolve_install_dir
 sync_repo
-run_panel
+run_toolbox
