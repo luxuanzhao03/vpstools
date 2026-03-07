@@ -54,6 +54,41 @@ func newHTTPClient(timeout time.Duration, streams int) *http.Client {
 	}
 }
 
+type countingReader struct {
+	reader io.Reader
+	count  uint64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 {
+		r.count += uint64(n)
+	}
+	return n, err
+}
+
+func (r *countingReader) Count() uint64 {
+	return r.count
+}
+
+func discardAndCount(reader io.Reader) (uint64, error) {
+	buf := make([]byte, 32<<10)
+	var total uint64
+
+	for {
+		n, err := reader.Read(buf)
+		if n > 0 {
+			total += uint64(n)
+		}
+		if err == io.EOF {
+			return total, nil
+		}
+		if err != nil {
+			return total, err
+		}
+	}
+}
+
 func benchmarkDownload(client *http.Client, rawURL string, duration time.Duration, workers int) networkEndpointResult {
 	result := networkEndpointResult{
 		URL: rawURL,
@@ -115,22 +150,27 @@ func benchmarkDownload(client *http.Client, rawURL string, duration time.Duratio
 				if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 					body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
 					resp.Body.Close()
-					setError(fmt.Errorf("下载请求返回 %s：%s", resp.Status, strings.TrimSpace(string(body))))
+					setError(fmt.Errorf("下载请求返回 %s: %s", resp.Status, strings.TrimSpace(string(body))))
 					return
 				}
 
-				n, err := io.Copy(io.Discard, resp.Body)
+				transferred, readErr := discardAndCount(resp.Body)
 				resp.Body.Close()
-				if err != nil {
+
+				if transferred > 0 {
+					atomic.AddUint64(&totalBytes, transferred)
+				}
+				if transferred > 0 || readErr == nil {
+					atomic.AddUint64(&totalRequests, 1)
+				}
+
+				if readErr != nil {
 					if ctx.Err() != nil {
 						return
 					}
-					setError(err)
+					setError(readErr)
 					return
 				}
-
-				atomic.AddUint64(&totalBytes, uint64(n))
-				atomic.AddUint64(&totalRequests, 1)
 			}
 		}()
 	}
@@ -202,7 +242,7 @@ func benchmarkUpload(client *http.Client, rawURL string, duration time.Duration,
 			defer wg.Done()
 
 			for time.Now().Before(deadline) {
-				body := bytes.NewReader(payload)
+				body := &countingReader{reader: bytes.NewReader(payload)}
 				req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, body)
 				if err != nil {
 					setError(err)
@@ -212,6 +252,14 @@ func benchmarkUpload(client *http.Client, rawURL string, duration time.Duration,
 				req.Header.Set("User-Agent", userAgent)
 
 				resp, err := client.Do(req)
+				uploaded := body.Count()
+				if uploaded > 0 {
+					atomic.AddUint64(&totalBytes, uploaded)
+				}
+				if uploaded > 0 || err == nil {
+					atomic.AddUint64(&totalRequests, 1)
+				}
+
 				if err != nil {
 					if ctx.Err() != nil {
 						return
@@ -226,9 +274,6 @@ func benchmarkUpload(client *http.Client, rawURL string, duration time.Duration,
 					setError(fmt.Errorf("上传请求返回 %s", resp.Status))
 					return
 				}
-
-				atomic.AddUint64(&totalBytes, uint64(payloadBytes))
-				atomic.AddUint64(&totalRequests, 1)
 			}
 		}()
 	}
